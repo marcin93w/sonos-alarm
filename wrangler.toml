@@ -1,0 +1,6 @@
+name = "sonos-alarm"
+main = "worker.js"
+compatibility_date = "2024-12-01"
+
+[triggers]
+crons = ["* 5-10 * * *"]
