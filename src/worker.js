@@ -41,6 +41,7 @@ export default {
         response_type: "code",
         redirect_uri: redirectUri,
         scope: "playback-control-all",
+        state: "none",
       });
       const authUrl = `${DEFAULT_OAUTH_BASE}/login/v3/oauth?${params.toString()}`;
       return Response.redirect(authUrl, 302);
