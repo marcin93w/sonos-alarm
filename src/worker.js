@@ -2,11 +2,6 @@ import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
 import { buildTokenStore } from "./sonos/token-store.js";
 import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./sonos/logger.js";
-import indexHtml from "./index.html";
-import appJs from "./static/app.js";
-import apiJs from "./static/api.js";
-import uiJs from "./static/ui.js";
-import stylesCss from "./static/styles.css";
 
 function createSonosClient(env) {
   const logger = createLogger();
@@ -36,51 +31,6 @@ export default {
   async fetch(request, env, ctx) {
     const logger = createLogger();
     const url = new URL(request.url);
-
-    if (url.pathname === "/") {
-      return new Response(indexHtml, {
-        status: 200,
-        headers: {
-          "content-type": "text/html; charset=utf-8",
-        },
-      });
-    }
-
-    if (url.pathname === "/app.js") {
-      return new Response(appJs, {
-        status: 200,
-        headers: {
-          "content-type": "application/javascript; charset=utf-8",
-        },
-      });
-    }
-
-    if (url.pathname === "/api.js") {
-      return new Response(apiJs, {
-        status: 200,
-        headers: {
-          "content-type": "application/javascript; charset=utf-8",
-        },
-      });
-    }
-
-    if (url.pathname === "/ui.js") {
-      return new Response(uiJs, {
-        status: 200,
-        headers: {
-          "content-type": "application/javascript; charset=utf-8",
-        },
-      });
-    }
-
-    if (url.pathname === "/styles.css") {
-      return new Response(stylesCss, {
-        status: 200,
-        headers: {
-          "content-type": "text/css; charset=utf-8",
-        },
-      });
-    }
 
     if (url.pathname === "/auth/status") {
       const tokenStore = buildTokenStore(env, logger);
@@ -115,6 +65,7 @@ export default {
     }
 
     if (url.pathname === "/auth/callback") {
+      const client = createSonosClient(env);
       const code = url.searchParams.get("code");
       if (!code) {
         return new Response("Missing code", { status: 400 });
@@ -159,7 +110,11 @@ export default {
       }
     }
 
-    return new Response("OK", { status: 200 });
+    if (env.ASSETS) {
+      return env.ASSETS.fetch(request);
+    }
+
+    return new Response("Not found", { status: 404 });
   },
   async scheduled(event, env, ctx) {
     const logger = createLogger();

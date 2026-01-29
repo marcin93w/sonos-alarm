@@ -11,7 +11,12 @@
 body {
   margin: 0;
   padding: 32px 24px 48px;
-  background: radial-gradient(circle at top left, #f8f4e7, #efe9d9 55%, #e6e1d6 100%);
+  background: radial-gradient(
+    circle at top left,
+    #f8f4e7,
+    #efe9d9 55%,
+    #e6e1d6 100%
+  );
   color: var(--ink);
 }
 

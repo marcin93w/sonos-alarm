@@ -1,5 +1,10 @@
 import { getAuthStatus, getGroups } from "./api.js";
-import { renderGroups, hideGroups, setConnectVisible, setStatus } from "./ui.js";
+import {
+  renderGroups,
+  hideGroups,
+  setConnectVisible,
+  setStatus,
+} from "./ui.js";
 
 async function updateAuthStatus() {
   try {
