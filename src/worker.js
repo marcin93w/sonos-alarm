@@ -2,7 +2,7 @@ import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
 import { buildTokenStore } from "./sonos/token-store.js";
 import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./sonos/logger.js";
-import indexHtml from "./index.html?raw";
+import indexHtml from "./index.html";
 
 function createSonosClient(env) {
   const logger = createLogger();

@@ -2,6 +2,10 @@ name = "sonos-alarm"
 main = "src/worker.js"
 compatibility_date = "2024-12-01"
 
+rules = [
+  { type = "Text", globs = ["**/*.html"] }
+]
+
 [triggers]
 crons = ["* 5-10 * * *", "* 21-23 * * *"]
 
