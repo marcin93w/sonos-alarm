@@ -143,10 +143,6 @@ async function refreshAlarms(env, logger) {
   return { refreshed: true, householdId, count };
 }
 
-async function adjustVolumeLevels(env, logger) {
-
-}
-
 export { SonosClient, HttpClient };
 
 export default {
