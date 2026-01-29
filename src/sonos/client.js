@@ -102,6 +102,7 @@ class SonosClient {
       `${this.apiBase}/households/${householdId}/alarms`
     );
     const data = await this.ensureJson(response, "getHouseholdAlarms");
+    this.logger.debug("Alarms data", { data });
     if (Array.isArray(data?.alarms)) return data.alarms;
     if (Array.isArray(data?.items)) return data.items;
     if (Array.isArray(data)) return data;
