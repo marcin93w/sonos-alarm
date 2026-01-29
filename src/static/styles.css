@@ -1,0 +1,69 @@
+:root {
+  color-scheme: light;
+  font-family: "Newsreader", "Georgia", serif;
+  line-height: 1.5;
+  --ink: #1a1a1a;
+  --muted: #5a5a5a;
+  --surface: #f3f2ee;
+  --accent: #0f6d50;
+}
+
+body {
+  margin: 0;
+  padding: 32px 24px 48px;
+  background: radial-gradient(circle at top left, #f8f4e7, #efe9d9 55%, #e6e1d6 100%);
+  color: var(--ink);
+}
+
+main {
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: 28px 32px;
+  box-shadow: 0 18px 40px rgba(18, 20, 20, 0.15);
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 2.2rem;
+}
+
+p {
+  margin: 0 0 12px;
+  color: var(--muted);
+}
+
+#connect-button {
+  display: inline-block;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+#groups {
+  margin-top: 20px;
+}
+
+#groups-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+#groups-list li {
+  background: white;
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+#status {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 0.95rem;
+}

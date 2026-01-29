@@ -3,6 +3,10 @@ import { HttpClient } from "./sonos/http.js";
 import { buildTokenStore } from "./sonos/token-store.js";
 import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./sonos/logger.js";
 import indexHtml from "./index.html";
+import appJs from "./static/app.js";
+import apiJs from "./static/api.js";
+import uiJs from "./static/ui.js";
+import stylesCss from "./static/styles.css";
 
 function createSonosClient(env) {
   const logger = createLogger();
@@ -38,6 +42,42 @@ export default {
         status: 200,
         headers: {
           "content-type": "text/html; charset=utf-8",
+        },
+      });
+    }
+
+    if (url.pathname === "/app.js") {
+      return new Response(appJs, {
+        status: 200,
+        headers: {
+          "content-type": "application/javascript; charset=utf-8",
+        },
+      });
+    }
+
+    if (url.pathname === "/api.js") {
+      return new Response(apiJs, {
+        status: 200,
+        headers: {
+          "content-type": "application/javascript; charset=utf-8",
+        },
+      });
+    }
+
+    if (url.pathname === "/ui.js") {
+      return new Response(uiJs, {
+        status: 200,
+        headers: {
+          "content-type": "application/javascript; charset=utf-8",
+        },
+      });
+    }
+
+    if (url.pathname === "/styles.css") {
+      return new Response(stylesCss, {
+        status: 200,
+        headers: {
+          "content-type": "text/css; charset=utf-8",
         },
       });
     }
