@@ -98,7 +98,21 @@ export default {
         }
         const householdId = first.id || first.householdId;
         const groups = await client.getGroups(householdId);
-        return new Response(JSON.stringify({ groups, householdId }), {
+        let alarms = [];
+        let alarmsError;
+        try {
+          alarms = await client.getHouseholdAlarms(householdId);
+        } catch (err) {
+          alarmsError = err?.message || String(err);
+          logger("warn", "get alarms failed", { error: alarmsError });
+        }
+        const groupsWithAlarms = groups.map((group) => ({
+          ...group,
+          alarms: client.getGroupAlarmsFromList(alarms, group),
+        }));
+        const payload = { groups: groupsWithAlarms, householdId };
+        if (alarmsError) payload.alarmsError = alarmsError;
+        return new Response(JSON.stringify(payload), {
           status: 200,
           headers: {
             "content-type": "application/json; charset=utf-8",

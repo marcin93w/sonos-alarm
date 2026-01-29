@@ -36,6 +36,17 @@ import { HttpError } from "./http.js";
  * @property {string} [model]
  */
 
+/**
+ * @typedef {Object} Alarm
+ * @property {string|number} [id]
+ * @property {string} [groupId]
+ * @property {string} [playerId]
+ * @property {string} [roomId]
+ * @property {string} [roomUUID]
+ * @property {string} [roomUuid]
+ * @property {string} [coordinatorId]
+ */
+
 class SonosClient {
   constructor(config) {
     this.oauthBase = config.oauthBase || DEFAULT_OAUTH_BASE;
@@ -84,6 +95,46 @@ class SonosClient {
     );
     const data = await this.ensureJson(response, "getGroups");
     return data.groups || [];
+  }
+
+  async getHouseholdAlarms(householdId) {
+    const response = await this.authedRequest(
+      `${this.apiBase}/households/${householdId}/alarms`
+    );
+    const data = await this.ensureJson(response, "getHouseholdAlarms");
+    if (Array.isArray(data?.alarms)) return data.alarms;
+    if (Array.isArray(data?.items)) return data.items;
+    if (Array.isArray(data)) return data;
+    return [];
+  }
+
+  getGroupAlarmsFromList(alarms, group) {
+    if (!Array.isArray(alarms) || !group) return [];
+    const groupIds = new Set(
+      [group.id, group.coordinatorId, ...(group.playerIds || [])].filter(Boolean)
+    );
+    return alarms.filter((alarm) => {
+      if (!alarm || typeof alarm !== "object") return false;
+      const alarmGroupId =
+        alarm.groupId || alarm.groupID || alarm.group || alarm.group_id;
+      if (alarmGroupId && alarmGroupId === group.id) return true;
+      const roomId =
+        alarm.roomId ||
+        alarm.roomID ||
+        alarm.roomUuid ||
+        alarm.roomUUID ||
+        alarm.RoomUUID ||
+        alarm.playerId ||
+        alarm.playerID ||
+        alarm.coordinatorId;
+      if (roomId && groupIds.has(roomId)) return true;
+      return false;
+    });
+  }
+
+  async getGroupAlarms(householdId, group) {
+    const alarms = await this.getHouseholdAlarms(householdId);
+    return this.getGroupAlarmsFromList(alarms, group);
   }
 
   async setVolume(groupId, percent) {
