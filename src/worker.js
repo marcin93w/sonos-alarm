@@ -2,6 +2,7 @@ import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
 import { buildTokenStore } from "./sonos/token-store.js";
 import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./sonos/logger.js";
+import indexHtml from "./index.html?raw";
 
 function createSonosClient(env) {
   const logger = createLogger();
@@ -31,7 +32,33 @@ export default {
   async fetch(request, env, ctx) {
     const logger = createLogger();
     const url = new URL(request.url);
-    const client = createSonosClient(env);
+
+    if (url.pathname === "/") {
+      return new Response(indexHtml, {
+        status: 200,
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+        },
+      });
+    }
+
+    if (url.pathname === "/auth/status") {
+      const tokenStore = buildTokenStore(env, logger);
+      const tokenSet = await tokenStore.getTokenSet();
+      const hasToken = Boolean(tokenSet?.access_token);
+      const hasRefreshToken = Boolean(tokenSet?.refresh_token);
+      return new Response(
+        JSON.stringify({
+          authenticated: hasToken && hasRefreshToken
+        }),
+        {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        }
+      );
+    }
 
     if (url.pathname === "/auth/start") {
       const redirectUri =
@@ -65,25 +92,39 @@ export default {
       }
     }
 
+    if (url.pathname === "/sonos/groups") {
+      const client = createSonosClient(env);
+      try {
+        const households = await client.getHouseholds();
+        const first = households[0];
+        if (!first) {
+          return new Response(JSON.stringify({ groups: [] }), {
+            status: 200,
+            headers: {
+              "content-type": "application/json; charset=utf-8",
+            },
+          });
+        }
+        const householdId = first.id || first.householdId;
+        const groups = await client.getGroups(householdId);
+        return new Response(JSON.stringify({ groups, householdId }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json; charset=utf-8",
+          },
+        });
+      } catch (err) {
+        logger("error", "get groups failed", { error: err?.message || String(err) });
+        return new Response("Failed to fetch groups", { status: 500 });
+      }
+    }
+
     return new Response("OK", { status: 200 });
   },
   async scheduled(event, env, ctx) {
     const logger = createLogger();
     try {
-      const client = createSonosClient(env);
       logger("info", "scheduled run", { time: new Date().toISOString() });
-      ctx.waitUntil(
-        client
-          .getHouseholds()
-          .then((households) => {
-            logger("info", "households discovered", {
-              count: households.length,
-            });
-          })
-          .catch((err) => {
-            logger("error", "scheduled check failed", { error: err.message });
-          })
-      );
     } catch (err) {
       logger("error", "scheduled init failed", {
         error: err?.message || String(err),

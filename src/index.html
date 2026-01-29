@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sonos alarm</title>
+  </head>
+  <body>
+    <h1>Sonos alarm</h1>
+    <p>
+      <a href="/auth/start" id="connect-button" style="display: none;">Connect Sonos</a>
+    </p>
+    <div id="groups" style="display: none;">
+      <h2>Groups</h2>
+      <ul id="groups-list"></ul>
+    </div>
+    <script>
+      async function loadGroups() {
+        const response = await fetch("/sonos/groups", { cache: "no-store" });
+        const data = await response.json();
+        const container = document.getElementById("groups");
+        const list = document.getElementById("groups-list");
+        if (!container || !list) return;
+        list.innerHTML = "";
+        const groups = Array.isArray(data?.groups) ? data.groups : [];
+        if (!groups.length) {
+          const item = document.createElement("li");
+          item.textContent = "No groups found.";
+          list.appendChild(item);
+        } else {
+          for (const group of groups) {
+            const item = document.createElement("li");
+            item.textContent = group.name || group.id || "Unnamed group";
+            list.appendChild(item);
+          }
+        }
+        container.style.display = "";
+      }
+
+      async function updateAuthStatus() {
+        const response = await fetch("/auth/status", { cache: "no-store" });
+        const data = await response.json();
+        const button = document.getElementById("connect-button");
+        const groups = document.getElementById("groups");
+        if (data && data.authenticated) {
+          if (button) button.style.display = "none";
+          await loadGroups();
+        } else {
+          if (button) button.style.display = "inline";
+          if (groups) groups.style.display = "none";
+        }
+      }
+      updateAuthStatus();
+    </script>
+  </body>
+</html>
