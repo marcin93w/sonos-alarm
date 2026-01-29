@@ -4,6 +4,20 @@ export function setConnectVisible(isVisible) {
   button.style.display = isVisible ? "inline-block" : "none";
 }
 
+function formatTime(isoString) {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDays(days) {
+  if (!days) return "";
+  if (Array.isArray(days)) return days.join(", ");
+  if (typeof days === "string") return days;
+  return "";
+}
+
 export function renderGroups(groups) {
   const container = document.getElementById("groups");
   const list = document.getElementById("groups-list");
@@ -41,23 +55,20 @@ export function renderGroups(groups) {
             continue;
           }
 
+          const description = alarm && alarm.description ? alarm.description : {};
+          const recurrence = description && description.recurrence ? description.recurrence : {};
+          const actuator = description && description.actuator ? description.actuator : {};
+
           const label =
             alarm && (alarm.label || alarm.name || alarm.title)
               ? alarm.label || alarm.name || alarm.title
-              : "Alarm";
-          const time =
-            alarm && (alarm.time || alarm.at || alarm.triggerTime)
-              ? alarm.time || alarm.at || alarm.triggerTime
-              : "";
+              : `Alarm ${alarm && alarm.alarmId ? alarm.alarmId : ""}`.trim();
+          const time = formatTime(description.startTime);
           const enabled =
             alarm && typeof alarm.enabled === "boolean" ? alarm.enabled : null;
-          const days = Array.isArray(alarm && alarm.days)
-            ? alarm.days.join(", ")
-            : alarm && typeof alarm.days === "string"
-            ? alarm.days
-            : "";
-          const volume =
-            alarm && Number.isFinite(alarm.volume) ? alarm.volume : null;
+          const days = formatDays(recurrence.days);
+          const volume = Number.isFinite(actuator.volume) ? actuator.volume : null;
+          const state = alarm && alarm.state ? alarm.state : "";
 
           const header = document.createElement("div");
           header.className = "alarm-header";
@@ -79,6 +90,7 @@ export function renderGroups(groups) {
           const metaParts = [];
           if (days) metaParts.push(days);
           if (volume !== null) metaParts.push(`Volume ${volume}`);
+          if (state) metaParts.push(state);
           if (metaParts.length) meta.textContent = metaParts.join(" | ");
 
           alarmItem.appendChild(header);

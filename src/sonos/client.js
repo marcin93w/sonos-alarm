@@ -38,13 +38,15 @@ import { HttpError } from "./http.js";
 
 /**
  * @typedef {Object} Alarm
- * @property {string|number} [id]
- * @property {string} [groupId]
- * @property {string} [playerId]
- * @property {string} [roomId]
- * @property {string} [roomUUID]
- * @property {string} [roomUuid]
- * @property {string} [coordinatorId]
+ * @property {string|number} [alarmId]
+ * @property {boolean} [enabled]
+ * @property {string} [state]
+ * @property {Object} [description]
+ * @property {Object} [description.actuator]
+ * @property {string} [description.actuator.id]
+ * @property {string} [description.actuator.target]
+ * @property {number} [description.actuator.volume]
+ * @property {string} [description.startTime]
  */
 
 class SonosClient {
@@ -102,7 +104,7 @@ class SonosClient {
       `${this.apiBase}/households/${householdId}/alarms`
     );
     const data = await this.ensureJson(response, "getHouseholdAlarms");
-    this.logger.debug("Alarms data", { data });
+    this.logger("debug", "Alarms data", { data });
     if (Array.isArray(data?.alarms)) return data.alarms;
     if (Array.isArray(data?.items)) return data.items;
     if (Array.isArray(data)) return data;
@@ -116,19 +118,11 @@ class SonosClient {
     );
     return alarms.filter((alarm) => {
       if (!alarm || typeof alarm !== "object") return false;
-      const alarmGroupId =
-        alarm.groupId || alarm.groupID || alarm.group || alarm.group_id;
-      if (alarmGroupId && alarmGroupId === group.id) return true;
-      const roomId =
-        alarm.roomId ||
-        alarm.roomID ||
-        alarm.roomUuid ||
-        alarm.roomUUID ||
-        alarm.RoomUUID ||
-        alarm.playerId ||
-        alarm.playerID ||
-        alarm.coordinatorId;
-      if (roomId && groupIds.has(roomId)) return true;
+      const actuatorId =
+        alarm?.description?.actuator?.id ||
+        alarm?.description?.actuatorId ||
+        alarm?.actuatorId;
+      if (actuatorId && groupIds.has(actuatorId)) return true;
       return false;
     });
   }
