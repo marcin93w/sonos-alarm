@@ -3,10 +3,10 @@ import { HttpClient } from "./sonos/http.js";
 import { buildAlarmStore } from "./sonos/alarm-store.js";
 import { buildTokenStore } from "./sonos/token-store.js";
 import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./sonos/logger.js";
+import { VolumeManager } from "./volume-manager.js";
+import { Alarm } from "./alarm.js";
 
 let alarmStore;
-const VOLUME_MIN = 1;
-const VOLUME_MAX = 15;
 
 function createSonosClient(env) {
   const logger = createLogger();
@@ -37,110 +37,43 @@ function getAlarmStore(env, logger) {
   return alarmStore;
 }
 
-function getLastOccurrenceMs(startTime, nowMs) {
-  const parsed = new Date(startTime);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const now = new Date(nowMs);
-  const hours = parsed.getUTCHours();
-  const minutes = parsed.getUTCMinutes();
-  const seconds = parsed.getUTCSeconds();
-  let occurrenceMs = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-    hours,
-    minutes,
-    seconds
-  );
-  if (occurrenceMs > nowMs) {
-    occurrenceMs -= 24 * 60 * 60 * 1000;
-  }
-  return occurrenceMs;
-}
-
-function minutesSinceLastStart(startTimes, nowMs) {
-  let lastMs = null;
-  for (const startTime of startTimes) {
-    const occurrenceMs = getLastOccurrenceMs(startTime, nowMs);
-    if (occurrenceMs === null) continue;
-    if (lastMs === null || occurrenceMs > lastMs) lastMs = occurrenceMs;
-  }
-  if (lastMs === null) return null;
-  return Math.floor((nowMs - lastMs) / 60000);
-}
-
-function volumeForMinutes(minutes) {
-  const clamped = Math.max(0, Math.min(60, minutes));
-  if (clamped === 0) return VOLUME_MIN;
-  if (clamped === 60) return VOLUME_MAX;
-  const ratio = clamped / 60;
-  const volume = VOLUME_MIN + (VOLUME_MAX - VOLUME_MIN) * ratio;
-  return Math.round(volume);
-}
-
-async function adjustVolumeLevels(env, logger) {
-  const alarmStore = getAlarmStore(env, logger);
-  const stored = await alarmStore.getAlarms();
-  const alarmsList = Array.isArray(stored?.alarms)
-    ? stored.alarms
-    : Array.isArray(stored)
-      ? stored
-      : [];
-  if (!alarmsList.length) {
-    logger("info", "adjust volume skipped, no alarms data");
-    return { adjusted: 0 };
-  }
-  const client = createSonosClient(env);
-  let householdId = stored?.householdId;
-  if (!householdId) {
-    const households = await client.getHouseholds();
-    const first = households[0];
-    if (!first) {
-      logger("warn", "no households found for volume adjust");
-      return { adjusted: 0 };
-    }
-    householdId = first.id || first.householdId;
-  }
-  const groups = await client.getGroups(householdId);
-  const nowMs = Date.now();
-  let adjusted = 0;
-  for (const group of groups) {
-    if (!group?.id) continue;
-    const groupAlarms = client.getGroupAlarmsFromList(alarmsList, group);
-    const startTimes = groupAlarms
-      .filter((alarm) => alarm?.enabled)
-      .map((alarm) => alarm?.description?.startTime)
-      .filter(Boolean);
-    if (!startTimes.length) continue;
-    const minutes = minutesSinceLastStart(startTimes, nowMs);
-    if (minutes === null) continue;
-    const volume = volumeForMinutes(minutes);
-    await client.setVolume(group.id, volume);
-    adjusted += 1;
-  }
-  return { adjusted };
-}
-
 async function refreshAlarms(env, logger) {
-  const alarms = getAlarmStore(env, logger);
-  const shouldRefresh = await alarms.shouldRefresh();
+  const store = getAlarmStore(env, logger);
+  const shouldRefresh = await store.shouldRefresh();
   if (!shouldRefresh) {
     logger("info", "alarms refresh skipped");
     return { refreshed: false };
   }
+  
   const client = createSonosClient(env);
+  
   const households = await client.getHouseholds();
-  const first = households[0];
-  if (!first) {
-    logger("warn", "no households found for alarms refresh");
-    return { refreshed: false };
-  }
+  const first = households[0] || (() => { throw new Error("No households found"); })();
   const householdId = first.id || first.householdId;
+  
   const alarmsData = await client.getHouseholdAlarms(householdId);
-  await alarms.saveAlarms({ householdId, alarms: alarmsData });
-  const count = Array.isArray(alarmsData) ? alarmsData.length : 0;
-  logger("info", "alarms refreshed", { householdId, count });
-  return { refreshed: true, householdId, count };
+  const groupsData = await client.getGroups(householdId);
+  const alarms = alarmsData.map((alarm) => new Alarm.fromSonosAlarm(alarm, groupsData));
+  await store.saveAlarms(alarms);
+
+  logger("info", "alarms refreshed", { householdId, count: alarms.length });
+}
+
+async function adjustVolumeLevels(env, logger) {
+  const alarmStore = getAlarmStore(env, logger);
+  const alarms = await alarmStore.getAlarms();
+
+  const client = createSonosClient(env);
+
+  const nowMs = Date.now();
+  
+  const manager = new VolumeManager(alarms);
+  const volumes = manager.calculateVolumes(nowMs);
+  
+  for (const [groupId, volume] of Object.entries(volumes)) {
+    await client.setVolume(groupId, volume);
+  }
+  await alarmStore.saveAlarms(alarms);
 }
 
 export { SonosClient, HttpClient };
@@ -226,7 +159,7 @@ export default {
         }
         const groupsWithAlarms = groups.map((group) => ({
           ...group,
-          alarms: client.getGroupAlarmsFromList(alarms, group),
+          alarms,
         }));
         const payload = { groups: groupsWithAlarms, householdId };
         if (alarmsError) payload.alarmsError = alarmsError;

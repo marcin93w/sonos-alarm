@@ -85,98 +85,6 @@ class SonosClient {
     return tokenSet;
   }
 
-  async getHouseholds() {
-    const response = await this.authedRequest(`${this.apiBase}/households`);
-    const data = await this.ensureJson(response, "getHouseholds");
-    return data.households || [];
-  }
-
-  async getGroups(householdId) {
-    const response = await this.authedRequest(
-      `${this.apiBase}/households/${householdId}/groups`
-    );
-    const data = await this.ensureJson(response, "getGroups");
-    return data.groups || [];
-  }
-
-  async getHouseholdAlarms(householdId) {
-    const response = await this.authedRequest(
-      `${this.apiBase}/households/${householdId}/alarms`
-    );
-    const data = await this.ensureJson(response, "getHouseholdAlarms");
-    this.logger("debug", "Alarms data", { data });
-    if (Array.isArray(data?.alarms)) return data.alarms;
-    if (Array.isArray(data?.items)) return data.items;
-    if (Array.isArray(data)) return data;
-    return [];
-  }
-
-  getGroupAlarmsFromList(alarms, group) {
-    if (!Array.isArray(alarms) || !group) return [];
-    const groupIds = new Set(
-      [group.id, group.coordinatorId, ...(group.playerIds || [])].filter(Boolean)
-    );
-    return alarms.filter((alarm) => {
-      if (!alarm || typeof alarm !== "object") return false;
-      const actuatorId =
-        alarm?.description?.actuator?.id ||
-        alarm?.description?.actuatorId ||
-        alarm?.actuatorId;
-      if (actuatorId && groupIds.has(actuatorId)) return true;
-      return false;
-    });
-  }
-
-  async getGroupAlarms(householdId, group) {
-    const alarms = await this.getHouseholdAlarms(householdId);
-    return this.getGroupAlarmsFromList(alarms, group);
-  }
-
-  async setVolume(groupId, percent) {
-    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
-      throw new Error("Volume must be between 0 and 100");
-    }
-    const payload = JSON.stringify({ volume: percent });
-    const response = await this.authedRequest(
-      `${this.apiBase}/groups/${groupId}/groupVolume`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: payload,
-      }
-    );
-    await this.ensureOk(response, "setVolume");
-    return true;
-  }
-
-  async volumeUp(groupId, step = 5) {
-    return this.adjustVolume(groupId, Math.abs(step));
-  }
-
-  async volumeDown(groupId, step = 5) {
-    return this.adjustVolume(groupId, -Math.abs(step));
-  }
-
-  async adjustVolume(groupId, delta) {
-    const group = await this.getGroupState(groupId);
-    const current = group?.groupVolume?.volume ?? 0;
-    const next = Math.max(0, Math.min(100, current + delta));
-    await this.setVolume(groupId, next);
-    return next;
-  }
-
-  async getGroupState(groupId) {
-    const households = await this.getHouseholds();
-    for (const household of households) {
-      const groups = await this.getGroups(household.id || household.householdId);
-      const match = groups.find((group) => group.id === groupId);
-      if (match) return match;
-    }
-    throw new Error("Group not found");
-  }
-
   async getValidAccessToken() {
     const tokenSet = await this.tokenStore.getTokenSet();
     if (!tokenSet) {
@@ -264,6 +172,51 @@ class SonosClient {
   basicAuthHeader() {
     const encoded = btoa(`${this.clientId}:${this.clientSecret}`);
     return `Basic ${encoded}`;
+  }
+
+  async getHouseholds() {
+    const response = await this.authedRequest(`${this.apiBase}/households`);
+    const data = await this.ensureJson(response, "getHouseholds");
+    return data.households || [];
+  }
+
+  async getGroups(householdId) {
+    const response = await this.authedRequest(
+      `${this.apiBase}/households/${householdId}/groups`
+    );
+    const data = await this.ensureJson(response, "getGroups");
+    return data.groups || [];
+  }
+
+  async getHouseholdAlarms(householdId) {
+    const response = await this.authedRequest(
+      `${this.apiBase}/households/${householdId}/alarms`
+    );
+    const data = await this.ensureJson(response, "getHouseholdAlarms");
+    this.logger("debug", "Alarms data", { data });
+    if (Array.isArray(data?.alarms)) return data.alarms;
+    if (Array.isArray(data?.items)) return data.items;
+    if (Array.isArray(data)) return data;
+    return [];
+  }
+
+  async setVolume(groupId, percent) {
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
+      throw new Error("Volume must be between 0 and 100");
+    }
+    const payload = JSON.stringify({ volume: percent });
+    const response = await this.authedRequest(
+      `${this.apiBase}/groups/${groupId}/groupVolume`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: payload,
+      }
+    );
+    await this.ensureOk(response, "setVolume");
+    return true;
   }
 }
 
