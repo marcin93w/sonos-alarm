@@ -25,11 +25,11 @@ class Alarm {
                 parsedStartTime.getUTCSeconds()
             );
         }
-        const groupIds = Alarm.findGroupIdsForAlarm(alarm, groups);
+        const groupIds = Alarm.#findGroupIdsForAlarm(alarm, groups);
         return new Alarm(alarmId, enabled, groupIds, volume, recurrenceDays, startTime);
     }
     
-    static findGroupIdsForAlarm(alarm, groups) {
+    static #findGroupIdsForAlarm(alarm, groups) {
         const actuatorId = alarm.description.actuator.id || (() => { throw new Error("Alarm actuator must have an id"); })();
         
         const ids = new Set();
@@ -42,21 +42,12 @@ class Alarm {
         return Array.from(ids);
     }
 
-    calculateMinutesFromStart(nowMs) {
-        if (!this.enabled) return null;
-
-        const daysSinceLastStart = this._calculateDaysSinceLastOccurrence(nowMs);
-        const minutesSinceLastStart = this._calculateMinutesSinceSameDayOccurrence(nowMs);
-
-        return minutesSinceLastStart + (daysSinceLastStart * 24 * 60);
-    }
-
     adjustVolume(nowMs, volumeMin = VOLUME_MIN, volumeMax = VOLUME_MAX) {
-        const minutes = this.calculateMinutesFromStart(nowMs);
+        const minutes = this.#calculateMinutesFromStart(nowMs);
         if (minutes === null || minutes === undefined) return false;
         if (minutes < 0 || minutes > 60) return false;
 
-        const volume = Alarm.volumeForMinutes(minutes, volumeMin, volumeMax);
+        const volume = Alarm.#volumeForMinutes(minutes, volumeMin, volumeMax);
         if (this.volume === volume) {
             return false;
         }
@@ -64,20 +55,16 @@ class Alarm {
         return true;
     }
 
-    setVolume(newVolume) {
-        this.volume = newVolume;
+    #calculateMinutesFromStart(nowMs) {
+        if (!this.enabled) return null;
+
+        const daysSinceLastStart = this.#calculateDaysSinceLastOccurrence(nowMs);
+        const minutesSinceLastStart = this.#calculateMinutesSinceSameDayOccurrence(nowMs);
+
+        return minutesSinceLastStart + (daysSinceLastStart * 24 * 60);
     }
 
-    static volumeForMinutes(minutes, volumeMin, volumeMax) {
-        const clamped = Math.max(0, Math.min(60, minutes));
-        if (clamped === 0) return volumeMin;
-        if (clamped === 60) return volumeMax;
-        const ratio = clamped / 60;
-        const volume = volumeMin + (volumeMax - volumeMin) * ratio;
-        return Math.round(volume);
-    }
-
-    _calculateDaysSinceLastOccurrence(nowMs) {
+    #calculateDaysSinceLastOccurrence(nowMs) {
         const now = new Date(nowMs);
 
         if (!this.recurrenceDays || this.recurrenceDays.length === 0) {
@@ -109,7 +96,7 @@ class Alarm {
         return daysSince;
     }
 
-    _calculateMinutesSinceSameDayOccurrence(nowMs) {
+    #calculateMinutesSinceSameDayOccurrence(nowMs) {
         const now = new Date(nowMs);
         const hours = this.startTime.getUTCHours();
         const minutes = this.startTime.getUTCMinutes();
@@ -129,6 +116,15 @@ class Alarm {
         }
         
         return Math.floor((nowMs - occurrenceMs) / 60000);
+    }
+
+    static #volumeForMinutes(minutes, volumeMin, volumeMax) {
+        const clamped = Math.max(0, Math.min(60, minutes));
+        if (clamped === 0) return volumeMin;
+        if (clamped === 60) return volumeMax;
+        const ratio = clamped / 60;
+        const volume = volumeMin + (volumeMax - volumeMin) * ratio;
+        return Math.round(volume);
     }
 }
 

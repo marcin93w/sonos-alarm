@@ -1,5 +1,7 @@
-import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE } from "./logger.js";
 import { HttpError } from "./http.js";
+
+const DEFAULT_OAUTH_BASE = "https://api.sonos.com";
+const DEFAULT_API_BASE = "https://api.ws.sonos.com/control/api/v1";
 
 /**
  * @typedef {Object} TokenSet
@@ -57,7 +59,6 @@ class SonosClient {
     this.clientSecret = config.clientSecret;
     this.tokenStore = config.tokenStore;
     this.http = config.httpClient;
-    this.logger = config.logger;
   }
 
   async authenticateWithAuthCode(code, redirectUri) {
@@ -193,7 +194,7 @@ class SonosClient {
       `${this.apiBase}/households/${householdId}/alarms`
     );
     const data = await this.ensureJson(response, "getHouseholdAlarms");
-    this.logger("debug", "Alarms data", { data });
+
     if (Array.isArray(data?.alarms)) return data.alarms;
     if (Array.isArray(data?.items)) return data.items;
     if (Array.isArray(data)) return data;

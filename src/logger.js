@@ -1,6 +1,3 @@
-const DEFAULT_OAUTH_BASE = "https://api.sonos.com";
-const DEFAULT_API_BASE = "https://api.ws.sonos.com/control/api/v1";
-
 const REDACTED = "[REDACTED]";
 
 function createLogger() {
@@ -25,4 +22,4 @@ function redactSecrets(meta) {
   return cloned;
 }
 
-export { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger };
+export { createLogger };

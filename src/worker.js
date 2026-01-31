@@ -1,8 +1,8 @@
 import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
-import { buildAlarmStore } from "./sonos/alarm-store.js";
+import { buildAlarmStore } from "./alarm-store.js";
 import { buildTokenStore } from "./sonos/token-store.js";
-import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./sonos/logger.js";
+import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./logger.js";
 import { Alarm } from "./alarm.js";
 
 let alarmStore;
@@ -24,8 +24,7 @@ function createSonosClient(env) {
     clientId: env.SONOS_CLIENT_ID,
     clientSecret: env.SONOS_CLIENT_SECRET,
     tokenStore,
-    httpClient,
-    logger,
+    httpClient
   });
 }
 
@@ -40,7 +39,6 @@ async function refreshAlarms(env, logger) {
   const store = getAlarmStore(env, logger);
   const shouldRefresh = await store.shouldRefresh();
   if (!shouldRefresh) {
-    logger("info", "alarms refresh skipped");
     return { refreshed: false };
   }
   
@@ -66,18 +64,16 @@ async function adjustVolumeLevels(env, logger) {
 
   const nowMs = Date.now();
   
-  const volumes = {};
   for (const alarm of alarms) {
     const volumeChanged = alarm.adjustVolume(nowMs);
     if (!volumeChanged) continue;
+    
+    logger("info", "adjusting alarm volume", { alarmId: alarm.alarmId, newVolume: alarm.volume });
     for (const groupId of alarm.groupIds) {
-      volumes[groupId] = alarm.volume;
+      await client.setVolume(groupId, alarm.volume);
     }
   }
   
-  for (const [groupId, volume] of Object.entries(volumes)) {
-    await client.setVolume(groupId, volume);
-  }
   await alarmStore.saveAlarms(alarms);
 }
 
