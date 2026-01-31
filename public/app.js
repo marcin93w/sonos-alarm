@@ -1,7 +1,7 @@
-import { getAuthStatus, getGroups } from "./api.js";
+import { getAuthStatus, getAlarms } from "./api.js";
 import {
-  renderGroups,
-  hideGroups,
+  renderAlarms,
+  hideAlarms,
   setConnectVisible,
   setStatus,
 } from "./ui.js";
@@ -12,20 +12,20 @@ async function updateAuthStatus() {
     const data = await getAuthStatus();
     if (data && data.authenticated) {
       setConnectVisible(false);
-      const groupsResponse = await getGroups();
-      const groups = Array.isArray(groupsResponse && groupsResponse.groups)
-        ? groupsResponse.groups
+      const alarmsResponse = await getAlarms();
+      const alarms = Array.isArray(alarmsResponse && alarmsResponse.alarms)
+        ? alarmsResponse.alarms
         : [];
-      renderGroups(groups);
+      renderAlarms(alarms);
       setStatus("");
     } else {
       setConnectVisible(true);
-      hideGroups();
+      hideAlarms();
       setStatus("Not connected.");
     }
   } catch (err) {
     setConnectVisible(true);
-    hideGroups();
+    hideAlarms();
     setStatus("Unable to load status.");
   }
 }

@@ -54,33 +54,14 @@ p {
   font-weight: 600;
 }
 
-#groups {
+#alarms {
   margin-top: 20px;
 }
 
-#groups-list {
+#alarms-list {
   list-style: none;
   padding: 0;
   margin: 12px 0 0;
-}
-
-#groups-list li {
-  background: #1a1916;
-  padding: 12px 14px;
-  border-radius: 10px;
-  margin-bottom: 8px;
-  border: 1px solid var(--border);
-}
-
-.group-title {
-  font-weight: 600;
-  margin-bottom: 8px;
-}
-
-.alarm-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .alarm-header {

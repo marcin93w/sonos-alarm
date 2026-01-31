@@ -6,10 +6,10 @@ export async function getAuthStatus() {
   return response.json();
 }
 
-export async function getGroups() {
-  const response = await fetch("/sonos/groups", { cache: "no-store" });
+export async function getAlarms() {
+  const response = await fetch("/alarms", { cache: "no-store" });
   if (!response.ok) {
-    throw new Error("Failed to load groups");
+    throw new Error("Failed to load alarms");
   }
   return response.json();
 }

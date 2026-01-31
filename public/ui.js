@@ -18,96 +18,74 @@ function formatDays(days) {
   return "";
 }
 
-export function renderGroups(groups) {
-  const container = document.getElementById("groups");
-  const list = document.getElementById("groups-list");
+export function renderAlarms(alarms) {
+  const container = document.getElementById("alarms");
+  const list = document.getElementById("alarms-list");
   if (!container || !list) return;
   list.innerHTML = "";
-  if (!groups.length) {
+  if (!alarms.length) {
     const item = document.createElement("li");
-    item.textContent = "No groups found.";
+    item.textContent = "No alarms found.";
     list.appendChild(item);
   } else {
-    for (const group of groups) {
-      const item = document.createElement("li");
-      const title = document.createElement("div");
-      title.className = "group-title";
-      title.textContent = group.name || group.id || "Unnamed group";
-      item.appendChild(title);
+    for (const alarm of alarms) {
+      const alarmItem = document.createElement("li");
+      alarmItem.className = "alarm-item";
 
-      const alarms = Array.isArray(group && group.alarms) ? group.alarms : [];
-      const alarmList = document.createElement("ul");
-      alarmList.className = "alarm-list";
-
-      if (!alarms.length) {
-        const alarmItem = document.createElement("li");
-        alarmItem.className = "alarm-empty";
-        alarmItem.textContent = "No alarms yet.";
-        alarmList.appendChild(alarmItem);
-      } else {
-        for (const alarm of alarms) {
-          const alarmItem = document.createElement("li");
-          alarmItem.className = "alarm-item";
-
-          if (typeof alarm === "string") {
-            alarmItem.textContent = alarm;
-            alarmList.appendChild(alarmItem);
-            continue;
-          }
-
-          const description = alarm && alarm.description ? alarm.description : {};
-          const recurrence = description && description.recurrence ? description.recurrence : {};
-          const actuator = description && description.actuator ? description.actuator : {};
-
-          const label =
-            alarm && (alarm.label || alarm.name || alarm.title)
-              ? alarm.label || alarm.name || alarm.title
-              : `Alarm ${alarm && alarm.alarmId ? alarm.alarmId : ""}`.trim();
-          const time = formatTime(description.startTime);
-          const enabled =
-            alarm && typeof alarm.enabled === "boolean" ? alarm.enabled : null;
-          const days = formatDays(recurrence.days);
-          const volume = Number.isFinite(actuator.volume) ? actuator.volume : null;
-          const state = alarm && alarm.state ? alarm.state : "";
-
-          const header = document.createElement("div");
-          header.className = "alarm-header";
-
-          const alarmTitle = document.createElement("div");
-          alarmTitle.className = "alarm-title";
-          alarmTitle.textContent = time ? `${label} - ${time}` : label;
-          header.appendChild(alarmTitle);
-
-          if (enabled !== null) {
-            const badge = document.createElement("span");
-            badge.className = enabled ? "alarm-badge on" : "alarm-badge off";
-            badge.textContent = enabled ? "Enabled" : "Paused";
-            header.appendChild(badge);
-          }
-
-          const meta = document.createElement("div");
-          meta.className = "alarm-meta";
-          const metaParts = [];
-          if (days) metaParts.push(days);
-          if (volume !== null) metaParts.push(`Volume ${volume}`);
-          if (state) metaParts.push(state);
-          if (metaParts.length) meta.textContent = metaParts.join(" | ");
-
-          alarmItem.appendChild(header);
-          if (meta.textContent) alarmItem.appendChild(meta);
-          alarmList.appendChild(alarmItem);
-        }
+      if (typeof alarm === "string") {
+        alarmItem.textContent = alarm;
+        list.appendChild(alarmItem);
+        continue;
       }
 
-      item.appendChild(alarmList);
-      list.appendChild(item);
+      const description = alarm && alarm.description ? alarm.description : {};
+      const recurrence = description && description.recurrence ? description.recurrence : {};
+      const actuator = description && description.actuator ? description.actuator : {};
+
+      const label =
+        alarm && (alarm.label || alarm.name || alarm.title)
+          ? alarm.label || alarm.name || alarm.title
+          : `Alarm ${alarm && alarm.alarmId ? alarm.alarmId : ""}`.trim();
+      const time = formatTime(description.startTime);
+      const enabled =
+        alarm && typeof alarm.enabled === "boolean" ? alarm.enabled : null;
+      const days = formatDays(recurrence.days);
+      const volume = Number.isFinite(actuator.volume) ? actuator.volume : null;
+      const state = alarm && alarm.state ? alarm.state : "";
+
+      const header = document.createElement("div");
+      header.className = "alarm-header";
+
+      const alarmTitle = document.createElement("div");
+      alarmTitle.className = "alarm-title";
+      alarmTitle.textContent = time ? `${label} - ${time}` : label;
+      header.appendChild(alarmTitle);
+
+      if (enabled !== null) {
+        const badge = document.createElement("span");
+        badge.className = enabled ? "alarm-badge on" : "alarm-badge off";
+        badge.textContent = enabled ? "Enabled" : "Paused";
+        header.appendChild(badge);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "alarm-meta";
+      const metaParts = [];
+      if (days) metaParts.push(days);
+      if (volume !== null) metaParts.push(`Volume ${volume}`);
+      if (state) metaParts.push(state);
+      if (metaParts.length) meta.textContent = metaParts.join(" | ");
+
+      alarmItem.appendChild(header);
+      if (meta.textContent) alarmItem.appendChild(meta);
+      list.appendChild(alarmItem);
     }
   }
   container.style.display = "block";
 }
 
-export function hideGroups() {
-  const container = document.getElementById("groups");
+export function hideAlarms() {
+  const container = document.getElementById("alarms");
   if (container) container.style.display = "none";
 }
 
