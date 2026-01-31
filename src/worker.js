@@ -35,10 +35,10 @@ function getAlarmStore(env, logger) {
   return alarmStore;
 }
 
-async function refreshAlarms(env, logger) {
+async function refreshAlarms(env, logger, force = false) {
   const store = getAlarmStore(env, logger);
   const shouldRefresh = await store.shouldRefresh();
-  if (!shouldRefresh) {
+  if (!shouldRefresh && !force) {
     return { refreshed: false };
   }
   
@@ -67,7 +67,7 @@ async function adjustVolumeLevels(env, logger) {
   for (const alarm of alarms) {
     const volumeChanged = alarm.adjustVolume(nowMs);
     if (!volumeChanged) continue;
-    
+
     logger("info", "adjusting alarm volume", { alarmId: alarm.alarmId, newVolume: alarm.volume });
     for (const groupId of alarm.groupIds) {
       await client.setVolume(groupId, alarm.volume);
@@ -103,77 +103,31 @@ export default {
     }
 
     if (url.pathname === "/auth/start") {
-      const redirectUri =
-        env.SONOS_REDIRECT_URI || `${url.origin}/auth/callback`;
-      const params = new URLSearchParams({
-        client_id: env.SONOS_CLIENT_ID,
-        response_type: "code",
-        redirect_uri: redirectUri,
-        scope: "playback-control-all",
-        state: "none",
-      });
-      const authUrl = `${DEFAULT_OAUTH_BASE}/login/v3/oauth?${params.toString()}`;
-      return Response.redirect(authUrl, 302);
+      const client = createSonosClient(env);
+      return Response.redirect(client.getAuthUrl(env), 302);
     }
 
     if (url.pathname === "/auth/callback") {
       const client = createSonosClient(env);
       const code = url.searchParams.get("code");
-      if (!code) {
-        return new Response("Missing code", { status: 400 });
-      }
-      const redirectUri =
-        env.SONOS_REDIRECT_URI || `${url.origin}/auth/callback`;
-      try {
-        await client.authenticateWithAuthCode(code, redirectUri);
-        return new Response("Authenticated. You can close this window.", {
-          status: 200,
-        });
-      } catch (err) {
-        logger("error", "auth failed", { error: err?.message || String(err) });
-        return new Response("Authentication failed", { status: 500 });
-      }
+
+      await client.authenticateWithAuthCode(code, env);
+      return new Response("Authenticated. You can close this window.", {
+        status: 200,
+      });
     }
 
-    if (url.pathname === "/sonos/groups") {
-      const client = createSonosClient(env);
-      try {
-        const households = await client.getHouseholds();
-        const first = households[0];
-        if (!first) {
-          return new Response(JSON.stringify({ groups: [] }), {
-            status: 200,
-            headers: {
-              "content-type": "application/json; charset=utf-8",
-            },
-          });
-        }
-        const householdId = first.id || first.householdId;
-        const groups = await client.getGroups(householdId);
-        let alarms = [];
-        let alarmsError;
-        try {
-          alarms = await client.getHouseholdAlarms(householdId);
-        } catch (err) {
-          alarmsError = err?.message || String(err);
-          logger("warn", "get alarms failed", { error: alarmsError });
-        }
-        const groupsWithAlarms = groups.map((group) => ({
-          ...group,
-          alarms,
-        }));
-        const payload = { groups: groupsWithAlarms, householdId };
-        if (alarmsError) payload.alarmsError = alarmsError;
-        return new Response(JSON.stringify(payload), {
-          status: 200,
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-          },
-        });
-      } catch (err) {
-        logger("error", "get groups failed", { error: err?.message || String(err) });
-        return new Response("Failed to fetch groups", { status: 500 });
-      }
+    if (url.pathname === "/alarms") {
+      await refreshAlarms(env, logger, true);
+      const alarmStore = getAlarmStore(env, logger);
+      const alarms = await alarmStore.getAlarms();
+
+      return new Response(JSON.stringify(alarms), {
+        status: 200,
+        headers: {
+          "content-type": "application/json; charset=utf-8",
+        },
+      });
     }
 
     if (env.ASSETS) {
