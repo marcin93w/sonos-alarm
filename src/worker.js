@@ -85,13 +85,10 @@ export default {
     const url = new URL(request.url);
 
     if (url.pathname === "/auth/status") {
-      const tokenStore = buildTokenStore(env, logger);
-      const tokenSet = await tokenStore.getTokenSet();
-      const hasToken = Boolean(tokenSet?.access_token);
-      const hasRefreshToken = Boolean(tokenSet?.refresh_token);
+      const client = createSonosClient(env);
       return new Response(
         JSON.stringify({
-          authenticated: hasToken && hasRefreshToken
+          authenticated: await client.isAuthenticated()
         }),
         {
           status: 200,

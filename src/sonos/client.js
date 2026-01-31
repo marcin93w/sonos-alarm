@@ -112,6 +112,11 @@ class SonosClient {
     return refreshed.access_token;
   }
 
+  async isAuthenticated() {
+    const tokenSet = await this.tokenStore.getTokenSet();
+    return !!tokenSet?.access_token && !!tokenSet?.refresh_token;
+  }
+
   async authedRequest(url, options = {}) {
     const token = await this.getValidAccessToken();
     let response = await this.http.request(url, {
