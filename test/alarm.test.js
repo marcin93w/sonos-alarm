@@ -121,6 +121,16 @@ test("Alarm.adjustVolume returns false for days when alarm is not occuring", () 
   assert.equal(result.volume, 9);
 });
 
+test("Alarm.adjustVolume runs every day when recurrence days are empty", () => {
+  const result = createRampAlarm({ recurrenceDays: [] });
+  // Test time: 2026-01-29T10:10:00 CET
+  const testTimeMs = Date.UTC(2026, 0, 29, 9, 10, 0);
+  const changed = result.adjustVolume(testTimeMs, 1, 15);
+
+  assert.equal(changed, true);
+  assert.equal(result.volume, 3);
+});
+
 test("Alarm.adjustVolume starts with VOLUME_MIN", () => {
   const result = createRampAlarm();
   const nowMs = Date.UTC(2026, 0, 26, 9, 1, 0); // Monday, 2026-01-26T08:01:00Z // MO, 9:01 AM CET
