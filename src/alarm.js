@@ -11,24 +11,25 @@ class Alarm {
         this.startTime = startTime;
     }
 
-    static fromSonosAlarm(alarm, groups) {
+    static fromSonosAlarm(alarm, groups, nowMs = Date.now()) {
         const alarmId = alarm.alarmId || (() => { throw new Error("Alarm must have an alarmId"); })();
         const enabled = Boolean(alarm.enabled);
         const volume = parseInt(alarm.description.actuator.volume || (() => { throw new Error("Alarm actuator must have a volume"); })());
         const recurrenceDays = alarm.description?.recurrence?.days || [];
-        const parsedStartTime = new Date(alarm.description.startTime);
-        const startTime = new Date(0);
-        if (!Number.isNaN(parsedStartTime.getTime())) {
-            startTime.setHours(
-                parsedStartTime.getUTCHours(),
-                parsedStartTime.getUTCMinutes(),
-                parsedStartTime.getUTCSeconds()
-            );
-        }
+        const startTime = Alarm.#convertSonosCETTimeToUTC(alarm.description.startTime, nowMs);
         const groupIds = Alarm.#findGroupIdsForAlarm(alarm, groups);
         return new Alarm(alarmId, enabled, groupIds, volume, recurrenceDays, startTime);
     }
-    
+
+    static #convertSonosCETTimeToUTC(sonosTimeStr, referenceMs) {
+        const referenceDate = new Date(referenceMs);
+        referenceDate.setMilliseconds(0);
+
+        const timeDifference = new Date(referenceDate.toLocaleString("en-US", { timeZone: "Europe/Paris" })) - referenceDate;
+        
+        return new Date(new Date(sonosTimeStr) - timeDifference);
+    }
+        
     static #findGroupIdsForAlarm(alarm, groups) {
         const actuatorId = alarm.description.actuator.id || (() => { throw new Error("Alarm actuator must have an id"); })();
         
@@ -44,6 +45,7 @@ class Alarm {
 
     adjustVolume(nowMs, volumeMin = VOLUME_MIN, volumeMax = VOLUME_MAX) {
         const minutes = this.#calculateMinutesFromStart(nowMs);
+
         if (minutes === null || minutes === undefined) return false;
         if (minutes < 0 || minutes > 60) return false;
 

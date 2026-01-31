@@ -79,10 +79,10 @@ test("Alarm.fromSonosAlarm maps core fields", () => {
   assert.deepEqual(result.recurrenceDays, ["MO", "TU", "TH", "FR"]);
 });
 
-test("Alarm.fromSonosAlarm maps start time correctly", () => {
+test("Alarm.fromSonosAlarm maps start time correctly to UTC", () => {
   const result = Alarm.fromSonosAlarm(alarm, groups);
 
-  assert.equal(result.startTime.getHours(), 9);
+  assert.equal(result.startTime.getHours(), 8);
   assert.equal(result.startTime.getMinutes(), 7);
 });
 
@@ -93,9 +93,19 @@ test("Alarm.fromSonosAlarm maps groups correctly", () => {
 });
 
 test("Alarm.adjustVolume computes volume based on minutes since start", () => {
-  const result = Alarm.fromSonosAlarm(alarm, groups);
   // Test time: 2026-01-30T09:10:00 CET
   const testTimeMs = Date.UTC(2026, 0, 30, 8, 10, 0);
+  const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs);
+  const changed = result.adjustVolume(testTimeMs, 1, 15);
+
+  assert.equal(changed, true);
+  assert.equal(result.volume, 2);
+});
+
+test("Alarm.adjustVolume computes volume based on minutes since start during daylight saving", () => {
+  // Test time: 2026-06-30T09:10:00 CET
+  const testTimeMs = Date.UTC(2026, 5, 30, 7, 10, 0);
+  const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs);
   const changed = result.adjustVolume(testTimeMs, 1, 15);
 
   assert.equal(changed, true);
@@ -115,6 +125,16 @@ test("Alarm.adjustVolume returns false for days when alarm is not occuring", () 
   const result = Alarm.fromSonosAlarm(alarm, groups);
   // Test time: 2026-01-28T09:10:00 CET
   const testTimeMs = Date.UTC(2026, 0, 28, 8, 10, 0);
+  const changed = result.adjustVolume(testTimeMs, 1, 15);
+
+  assert.equal(changed, false);
+  assert.equal(result.volume, 9);
+});
+
+test("Alarm.adjustVolume returns false for when alarm run more than 1 hour ago", () => {
+  const result = Alarm.fromSonosAlarm(alarm, groups);
+  // Test time: 2026-01-30T10:10:00 CET (more than 1 hour after start)
+  const testTimeMs = Date.UTC(2026, 0, 30, 9, 10, 0);
   const changed = result.adjustVolume(testTimeMs, 1, 15);
 
   assert.equal(changed, false);
