@@ -2,7 +2,7 @@ import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
 import { buildAlarmStore } from "./alarm-store.js";
 import { buildTokenStore } from "./sonos/token-store.js";
-import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./logger.js";
+import { createLogger } from "./logger.js";
 import { Alarm } from "./alarm.js";
 
 let alarmStore;
@@ -19,8 +19,8 @@ function createSonosClient(env) {
   });
   const tokenStore = buildTokenStore(env, logger);
   return new SonosClient({
-    oauthBase: env.SONOS_OAUTH_BASE || DEFAULT_OAUTH_BASE,
-    apiBase: env.SONOS_API_BASE || DEFAULT_API_BASE,
+    oauthBase: env.SONOS_OAUTH_BASE,
+    apiBase: env.SONOS_API_BASE,
     clientId: env.SONOS_CLIENT_ID,
     clientSecret: env.SONOS_CLIENT_SECRET,
     tokenStore,
