@@ -1,3 +1,6 @@
+const VOLUME_MIN = 1;
+const VOLUME_MAX = 15;
+
 class Alarm {
     constructor(alarmId, enabled, groupIds, volume, recurrenceDays, startTime) {
         this.alarmId = alarmId;
@@ -48,8 +51,30 @@ class Alarm {
         return minutesSinceLastStart + (daysSinceLastStart * 24 * 60);
     }
 
+    adjustVolume(nowMs, volumeMin = VOLUME_MIN, volumeMax = VOLUME_MAX) {
+        const minutes = this.calculateMinutesFromStart(nowMs);
+        if (minutes === null || minutes === undefined) return false;
+        if (minutes < 0 || minutes > 60) return false;
+
+        const volume = Alarm.volumeForMinutes(minutes, volumeMin, volumeMax);
+        if (this.volume === volume) {
+            return false;
+        }
+        this.volume = volume;
+        return true;
+    }
+
     setVolume(newVolume) {
         this.volume = newVolume;
+    }
+
+    static volumeForMinutes(minutes, volumeMin, volumeMax) {
+        const clamped = Math.max(0, Math.min(60, minutes));
+        if (clamped === 0) return volumeMin;
+        if (clamped === 60) return volumeMax;
+        const ratio = clamped / 60;
+        const volume = volumeMin + (volumeMax - volumeMin) * ratio;
+        return Math.round(volume);
     }
 
     _calculateDaysSinceLastOccurrence(nowMs) {

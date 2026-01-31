@@ -3,7 +3,6 @@ import { HttpClient } from "./sonos/http.js";
 import { buildAlarmStore } from "./sonos/alarm-store.js";
 import { buildTokenStore } from "./sonos/token-store.js";
 import { DEFAULT_OAUTH_BASE, DEFAULT_API_BASE, createLogger } from "./sonos/logger.js";
-import { VolumeManager } from "./volume-manager.js";
 import { Alarm } from "./alarm.js";
 
 let alarmStore;
@@ -53,7 +52,7 @@ async function refreshAlarms(env, logger) {
   
   const alarmsData = await client.getHouseholdAlarms(householdId);
   const groupsData = await client.getGroups(householdId);
-  const alarms = alarmsData.map((alarm) => new Alarm.fromSonosAlarm(alarm, groupsData));
+  const alarms = alarmsData.map((alarm) => Alarm.fromSonosAlarm(alarm, groupsData));
   await store.saveAlarms(alarms);
 
   logger("info", "alarms refreshed", { householdId, count: alarms.length });
@@ -67,8 +66,14 @@ async function adjustVolumeLevels(env, logger) {
 
   const nowMs = Date.now();
   
-  const manager = new VolumeManager(alarms);
-  const volumes = manager.calculateVolumes(nowMs);
+  const volumes = {};
+  for (const alarm of alarms) {
+    const volumeChanged = alarm.adjustVolume(nowMs);
+    if (!volumeChanged) continue;
+    for (const groupId of alarm.groupIds) {
+      volumes[groupId] = alarm.volume;
+    }
+  }
   
   for (const [groupId, volume] of Object.entries(volumes)) {
     await client.setVolume(groupId, volume);
