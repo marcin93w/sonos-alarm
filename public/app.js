@@ -13,7 +13,9 @@ async function updateAuthStatus() {
     if (data && data.authenticated) {
       setConnectVisible(false);
       const alarmsResponse = await getAlarms();
-      const alarms = Array.isArray(alarmsResponse && alarmsResponse.alarms)
+      const alarms = Array.isArray(alarmsResponse)
+        ? alarmsResponse
+        : Array.isArray(alarmsResponse && alarmsResponse.alarms)
         ? alarmsResponse.alarms
         : [];
       renderAlarms(alarms);

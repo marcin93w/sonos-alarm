@@ -38,20 +38,19 @@ export function renderAlarms(alarms) {
         continue;
       }
 
-      const description = alarm && alarm.description ? alarm.description : {};
-      const recurrence = description && description.recurrence ? description.recurrence : {};
-      const actuator = description && description.actuator ? description.actuator : {};
-
       const label =
         alarm && (alarm.label || alarm.name || alarm.title)
           ? alarm.label || alarm.name || alarm.title
           : `Alarm ${alarm && alarm.alarmId ? alarm.alarmId : ""}`.trim();
-      const time = formatTime(description.startTime);
+      const time = formatTime(alarm && alarm.startTime);
       const enabled =
         alarm && typeof alarm.enabled === "boolean" ? alarm.enabled : null;
-      const days = formatDays(recurrence.days);
-      const volume = Number.isFinite(actuator.volume) ? actuator.volume : null;
-      const state = alarm && alarm.state ? alarm.state : "";
+      const days = formatDays(alarm && alarm.recurrenceDays);
+      const volume =
+        alarm && Number.isFinite(alarm.volume) ? alarm.volume : null;
+      const groupIds = Array.isArray(alarm && alarm.groupIds)
+        ? alarm.groupIds.join(", ")
+        : "";
 
       const header = document.createElement("div");
       header.className = "alarm-header";
@@ -73,7 +72,7 @@ export function renderAlarms(alarms) {
       const metaParts = [];
       if (days) metaParts.push(days);
       if (volume !== null) metaParts.push(`Volume ${volume}`);
-      if (state) metaParts.push(state);
+      if (groupIds) metaParts.push(groupIds);
       if (metaParts.length) meta.textContent = metaParts.join(" | ");
 
       alarmItem.appendChild(header);
