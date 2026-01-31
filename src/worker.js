@@ -62,7 +62,7 @@ async function adjustVolumeLevels(env, logger) {
 
   const client = createSonosClient(env);
 
-  const nowMs = Date.now();
+  const nowMs = Date.UTC();
   
   for (const alarm of alarms) {
     const volumeChanged = alarm.adjustVolume(nowMs);
