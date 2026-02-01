@@ -11,6 +11,28 @@ class Alarm {
         this.startTime = startTime;
     }
 
+    static fromJSON(obj) {
+        return new Alarm(
+            obj.alarmId,
+            obj.enabled,
+            obj.groupIds,
+            obj.volume,
+            obj.recurrenceDays,
+            new Date(obj.startTime)
+        );
+    }
+
+    toJSON() {
+        return {
+            alarmId: this.alarmId,
+            enabled: this.enabled,
+            groupIds: this.groupIds,
+            volume: this.volume,
+            recurrenceDays: this.recurrenceDays,
+            startTime: this.startTime.toISOString(),
+        };
+    }
+
     static fromSonosAlarm(alarm, groups, nowMs = Date.now()) {
         const alarmId = alarm.alarmId || (() => { throw new Error("Alarm must have an alarmId"); })();
         const enabled = Boolean(alarm.enabled);

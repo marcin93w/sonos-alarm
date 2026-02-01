@@ -1,14 +1,13 @@
 import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
 import { buildAlarmStore } from "./alarm-store.js";
-import { buildTokenStore } from "./sonos/token-store.js";
+import { buildTokenStore, MemoryTokenStore } from "./sonos/token-store.js";
 import { createLogger } from "./logger.js";
 import { Alarm } from "./alarm.js";
+import { SessionManager } from "./session.js";
+import { UserRegistry } from "./user-registry.js";
 
-let alarmStore;
-
-function createSonosClient(env) {
-  const logger = createLogger();
+function createSonosClient(env, logger, tokenStore) {
   if (!env.SONOS_CLIENT_ID || !env.SONOS_CLIENT_SECRET) {
     throw new Error("SONOS_CLIENT_ID and SONOS_CLIENT_SECRET are required");
   }
@@ -17,64 +16,59 @@ function createSonosClient(env) {
     retries: Number(env.HTTP_RETRIES) || 2,
     logger,
   });
-  const tokenStore = buildTokenStore(env, logger);
   return new SonosClient({
     oauthBase: env.SONOS_OAUTH_BASE,
     apiBase: env.SONOS_API_BASE,
     clientId: env.SONOS_CLIENT_ID,
     clientSecret: env.SONOS_CLIENT_SECRET,
     tokenStore,
-    httpClient
+    httpClient,
   });
 }
 
-function getAlarmStore(env, logger) {
-  if (!alarmStore) {
-    alarmStore = buildAlarmStore(env, logger);
-  }
-  return alarmStore;
+function createSonosClientForUser(env, logger, userId) {
+  const tokenStore = buildTokenStore(env, logger, userId);
+  return createSonosClient(env, logger, tokenStore);
 }
 
-async function refreshAlarms(env, logger, force = false) {
-  const store = getAlarmStore(env, logger);
+async function refreshAlarmsForUser(env, logger, userId, store, force = false) {
   const shouldRefresh = await store.shouldRefresh();
   if (!shouldRefresh && !force) {
-    return { refreshed: false };
+    return;
   }
-  
-  const client = createSonosClient(env);
-  
+
+  const client = createSonosClientForUser(env, logger, userId);
+
   const households = await client.getHouseholds();
   const first = households[0] || (() => { throw new Error("No households found"); })();
   const householdId = first.id || first.householdId;
-  
+
   const alarmsData = await client.getHouseholdAlarms(householdId);
   const groupsData = await client.getGroups(householdId);
   const alarms = alarmsData.map((alarm) => Alarm.fromSonosAlarm(alarm, groupsData));
   await store.saveAlarms(alarms);
 
-  logger("info", "alarms refreshed", { householdId, count: alarms.length });
+  logger("info", "alarms refreshed", { userId, householdId, count: alarms.length });
 }
 
-async function adjustVolumeLevels(env, logger) {
-  const alarmStore = getAlarmStore(env, logger);
-  const alarms = await alarmStore.getAlarms();
+async function adjustVolumeLevelsForUser(env, logger, userId, store) {
+  const alarms = await store.getAlarms();
+  if (!alarms || alarms.length === 0) return;
 
-  const client = createSonosClient(env);
-
+  const client = createSonosClientForUser(env, logger, userId);
   const nowMs = Date.now();
-  
+
   for (const alarm of alarms) {
     const volumeChanged = alarm.adjustVolume(nowMs);
     if (!volumeChanged) continue;
 
-    logger("info", "adjusting alarm volume", { alarmId: alarm.alarmId, newVolume: alarm.volume });
+    logger("info", "adjusting alarm volume", { userId, alarmId: alarm.alarmId, newVolume: alarm.volume });
     for (const groupId of alarm.groupIds) {
       await client.setVolume(groupId, alarm.volume);
     }
   }
-  
-  await alarmStore.saveAlarms(alarms);
+
+  await store.saveAlarms(alarms);
 }
 
 export { SonosClient, HttpClient };
@@ -83,48 +77,83 @@ export default {
   async fetch(request, env, ctx) {
     const logger = createLogger();
     const url = new URL(request.url);
+    const sessions = new SessionManager(env.TOKEN_KV);
 
     if (url.pathname === "/auth/status") {
-      const client = createSonosClient(env);
-      return new Response(
-        JSON.stringify({
-          authenticated: await client.isAuthenticated()
-        }),
-        {
-          status: 200,
-          headers: {
-            "content-type": "application/json; charset=utf-8",
-          },
-        }
-      );
+      const userId = await sessions.getUserId(request);
+      if (!userId) {
+        return Response.json({ authenticated: false });
+      }
+      const client = createSonosClientForUser(env, logger, userId);
+      return Response.json({ authenticated: await client.isAuthenticated() });
     }
 
     if (url.pathname === "/auth/start") {
-      const client = createSonosClient(env);
+      const tempStore = new MemoryTokenStore();
+      const client = createSonosClient(env, logger, tempStore);
       return Response.redirect(client.getAuthUrl(env), 302);
     }
 
     if (url.pathname === "/auth/callback") {
-      const client = createSonosClient(env);
       const code = url.searchParams.get("code");
 
-      await client.authenticateWithAuthCode(code, env);
-      return new Response("Authenticated. You can close this window.", {
-        status: 200,
+      // Exchange code using a temporary in-memory token store
+      const tempStore = new MemoryTokenStore();
+      const tempClient = createSonosClient(env, logger, tempStore);
+      const tokenSet = await tempClient.authenticateWithAuthCode(code, env);
+
+      // Derive userId from household
+      const households = await tempClient.getHouseholds();
+      const first = households[0];
+      if (!first) {
+        return new Response("No Sonos households found.", { status: 400 });
+      }
+      const userId = first.id || first.householdId;
+
+      // Save tokens under user-specific key
+      const userTokenStore = buildTokenStore(env, logger, userId);
+      await userTokenStore.saveTokenSet(tokenSet);
+
+      // Register user for cron processing
+      const registry = new UserRegistry(env.TOKEN_KV);
+      await registry.registerUser(userId);
+
+      // Create session and redirect with cookie
+      const sessionId = await sessions.createSession(userId);
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: "/",
+          "Set-Cookie": sessions.buildSetCookieHeader(sessionId),
+        },
+      });
+    }
+
+    if (url.pathname === "/auth/logout") {
+      const sessionId = sessions.getSessionId(request);
+      if (sessionId) {
+        await env.TOKEN_KV.delete(`session:${sessionId}`);
+      }
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: "/",
+          "Set-Cookie": SessionManager.clearCookieHeader(),
+        },
       });
     }
 
     if (url.pathname === "/alarms") {
-      await refreshAlarms(env, logger, true);
-      const alarmStore = getAlarmStore(env, logger);
-      const alarms = await alarmStore.getAlarms();
+      const userId = await sessions.getUserId(request);
+      if (!userId) {
+        return Response.json({ error: "Not authenticated" }, { status: 401 });
+      }
 
-      return new Response(JSON.stringify(alarms), {
-        status: 200,
-        headers: {
-          "content-type": "application/json; charset=utf-8",
-        },
-      });
+      const store = buildAlarmStore(env, logger, userId);
+      await refreshAlarmsForUser(env, logger, userId, store, true);
+      const alarms = await store.getAlarms();
+
+      return Response.json(alarms || []);
     }
 
     if (env.ASSETS) {
@@ -133,16 +162,25 @@ export default {
 
     return new Response("Not found", { status: 404 });
   },
+
   async scheduled(event, env, ctx) {
     const logger = createLogger();
-    try {
-      logger("info", "scheduled run", { time: new Date().toISOString() });
-      await refreshAlarms(env, logger);
-      await adjustVolumeLevels(env, logger);
-    } catch (err) {
-      logger("error", "scheduled init failed", {
-        error: err?.message || String(err),
-      });
+    const registry = new UserRegistry(env.TOKEN_KV);
+    const userIds = await registry.getAllUserIds();
+
+    logger("info", "scheduled run", { time: new Date().toISOString(), userCount: userIds.length });
+
+    for (const userId of userIds) {
+      try {
+        const store = buildAlarmStore(env, logger, userId);
+        await refreshAlarmsForUser(env, logger, userId, store);
+        await adjustVolumeLevelsForUser(env, logger, userId, store);
+      } catch (err) {
+        logger("error", "scheduled processing failed for user", {
+          userId,
+          error: err?.message || String(err),
+        });
+      }
     }
   },
 };

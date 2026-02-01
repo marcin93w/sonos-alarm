@@ -27,10 +27,10 @@ class MemoryTokenStore extends TokenStore {
 }
 
 class KvTokenStore extends TokenStore {
-  constructor(kvNamespace) {
+  constructor(kvNamespace, key) {
     super();
     this.kv = kvNamespace;
-    this.key = "sonos:token";
+    this.key = key;
   }
   async getTokenSet() {
     return this.kv.get(this.key, { type: "json" });
@@ -43,9 +43,9 @@ class KvTokenStore extends TokenStore {
   }
 }
 
-function buildTokenStore(env, logger) {
+function buildTokenStore(env, logger, userId) {
   if (env.TOKEN_KV) {
-    return new KvTokenStore(env.TOKEN_KV);
+    return new KvTokenStore(env.TOKEN_KV, `user:${userId}:token`);
   }
   logger("warn", "TOKEN_KV not configured, using memory token store");
   return new MemoryTokenStore();
