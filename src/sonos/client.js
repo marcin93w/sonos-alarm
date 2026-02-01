@@ -57,7 +57,6 @@ class SonosClient {
     this.apiBase = config.apiBase || DEFAULT_API_BASE;
     this.clientId = config.clientId;
     this.clientSecret = config.clientSecret;
-    this.tokenStore = config.tokenStore;
     this.http = config.httpClient;
   }
 
@@ -80,13 +79,11 @@ class SonosClient {
       code,
       redirect_uri: redirectUri,
     });
-    const tokenSet = await this.requestToken(body);
-    await this.tokenStore.saveTokenSet(tokenSet);
-    return tokenSet;
+    return this.requestToken(body);
   }
 
-  async refreshAccessToken() {
-    const existing = await this.tokenStore.getTokenSet();
+  async refreshAccessToken(tokenStore) {
+    const existing = await tokenStore.getTokenSet();
     if (!existing?.refresh_token) {
       throw new Error("Missing refresh token");
     }
@@ -94,13 +91,21 @@ class SonosClient {
       grant_type: "refresh_token",
       refresh_token: existing.refresh_token,
     });
-    const tokenSet = await this.requestToken(body, existing.refresh_token);
-    await this.tokenStore.saveTokenSet(tokenSet);
-    return tokenSet;
+    try {
+      const tokenSet = await this.requestToken(body, existing.refresh_token);
+      await tokenStore.saveTokenSet(tokenSet);
+      return tokenSet;
+    } catch (err) {
+      if (err.body?.error === "invalid_grant") {
+        await tokenStore.clear();
+      }
+      throw err;
+    }
   }
 
-  async getValidAccessToken() {
-    const tokenSet = await this.tokenStore.getTokenSet();
+  async getValidAccessToken(tokenStore) {
+    if (typeof tokenStore === "string") return tokenStore;
+    const tokenSet = await tokenStore.getTokenSet();
     if (!tokenSet) {
       throw new Error("Not authenticated");
     }
@@ -108,17 +113,17 @@ class SonosClient {
     if (tokenSet.expires_at && tokenSet.expires_at > now + 30) {
       return tokenSet.access_token;
     }
-    const refreshed = await this.refreshAccessToken();
+    const refreshed = await this.refreshAccessToken(tokenStore);
     return refreshed.access_token;
   }
 
-  async isAuthenticated() {
-    const tokenSet = await this.tokenStore.getTokenSet();
+  async isAuthenticated(tokenStore) {
+    const tokenSet = await tokenStore.getTokenSet();
     return !!tokenSet?.access_token && !!tokenSet?.refresh_token;
   }
 
-  async authedRequest(url, options = {}) {
-    const token = await this.getValidAccessToken();
+  async authedRequest(url, options, tokenStore) {
+    const token = await this.getValidAccessToken(tokenStore);
     let response = await this.http.request(url, {
       ...options,
       headers: {
@@ -126,8 +131,8 @@ class SonosClient {
         ...(options.headers || {}),
       },
     });
-    if (response.status === 401) {
-      const refreshed = await this.refreshAccessToken();
+    if (response.status === 401 && typeof tokenStore !== "string") {
+      const refreshed = await this.refreshAccessToken(tokenStore);
       response = await this.http.request(url, {
         ...options,
         headers: {
@@ -156,11 +161,11 @@ class SonosClient {
     const data = await response.json().catch(() => ({}));
     console.log("requestToken response", { status: response.status, data });
     if (!response.ok) {
-      if (data?.error === "invalid_grant") {
-        await this.tokenStore.clear();
-        throw new HttpError("Refresh token revoked", response.status, data);
-      }
-      throw new HttpError("Token request failed", response.status, data);
+      throw new HttpError(
+        data?.error === "invalid_grant" ? "Refresh token revoked" : "Token request failed",
+        response.status,
+        data
+      );
     }
     const now = Math.floor(Date.now() / 1000);
     return {
@@ -196,23 +201,23 @@ class SonosClient {
     return `Basic ${encoded}`;
   }
 
-  async getHouseholds() {
-    const response = await this.authedRequest(`${this.apiBase}/households`);
+  async getHouseholds(tokenStore) {
+    const response = await this.authedRequest(`${this.apiBase}/households`, {}, tokenStore);
     const data = await this.ensureJson(response, "getHouseholds");
     return data.households || [];
   }
 
-  async getGroups(householdId) {
+  async getGroups(householdId, tokenStore) {
     const response = await this.authedRequest(
-      `${this.apiBase}/households/${householdId}/groups`
+      `${this.apiBase}/households/${householdId}/groups`, {}, tokenStore
     );
     const data = await this.ensureJson(response, "getGroups");
     return data.groups || [];
   }
 
-  async getHouseholdAlarms(householdId) {
+  async getHouseholdAlarms(householdId, tokenStore) {
     const response = await this.authedRequest(
-      `${this.apiBase}/households/${householdId}/alarms`
+      `${this.apiBase}/households/${householdId}/alarms`, {}, tokenStore
     );
     const data = await this.ensureJson(response, "getHouseholdAlarms");
 
@@ -222,7 +227,7 @@ class SonosClient {
     return [];
   }
 
-  async setVolume(groupId, percent) {
+  async setVolume(groupId, percent, tokenStore) {
     if (!Number.isFinite(percent) || percent < 0 || percent > 100) {
       throw new Error("Volume must be between 0 and 100");
     }
@@ -235,7 +240,8 @@ class SonosClient {
           "Content-Type": "application/json",
         },
         body: payload,
-      }
+      },
+      tokenStore
     );
     await this.ensureOk(response, "setVolume");
     return true;

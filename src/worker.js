@@ -1,13 +1,13 @@
 import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
 import { buildAlarmStore } from "./alarm-store.js";
-import { buildTokenStore, MemoryTokenStore } from "./sonos/token-store.js";
+import { buildTokenStore } from "./sonos/token-store.js";
 import { createLogger } from "./logger.js";
 import { Alarm } from "./alarm.js";
 import { SessionManager } from "./session.js";
 import { UserRegistry } from "./user-registry.js";
 
-function createSonosClient(env, logger, tokenStore) {
+function createSonosClient(env, logger) {
   if (!env.SONOS_CLIENT_ID || !env.SONOS_CLIENT_SECRET) {
     throw new Error("SONOS_CLIENT_ID and SONOS_CLIENT_SECRET are required");
   }
@@ -21,14 +21,8 @@ function createSonosClient(env, logger, tokenStore) {
     apiBase: env.SONOS_API_BASE,
     clientId: env.SONOS_CLIENT_ID,
     clientSecret: env.SONOS_CLIENT_SECRET,
-    tokenStore,
     httpClient,
   });
-}
-
-function createSonosClientForUser(env, logger, userId) {
-  const tokenStore = buildTokenStore(env, logger, userId);
-  return createSonosClient(env, logger, tokenStore);
 }
 
 async function refreshAlarmsForUser(env, logger, userId, store, force = false) {
@@ -37,14 +31,15 @@ async function refreshAlarmsForUser(env, logger, userId, store, force = false) {
     return;
   }
 
-  const client = createSonosClientForUser(env, logger, userId);
+  const client = createSonosClient(env, logger);
+  const tokenStore = buildTokenStore(env, logger, userId);
 
-  const households = await client.getHouseholds();
+  const households = await client.getHouseholds(tokenStore);
   const first = households[0] || (() => { throw new Error("No households found"); })();
   const householdId = first.id || first.householdId;
 
-  const alarmsData = await client.getHouseholdAlarms(householdId);
-  const groupsData = await client.getGroups(householdId);
+  const alarmsData = await client.getHouseholdAlarms(householdId, tokenStore);
+  const groupsData = await client.getGroups(householdId, tokenStore);
   const alarms = alarmsData.map((alarm) => Alarm.fromSonosAlarm(alarm, groupsData));
   await store.saveAlarms(alarms);
 
@@ -55,7 +50,8 @@ async function adjustVolumeLevelsForUser(env, logger, userId, store) {
   const alarms = await store.getAlarms();
   if (!alarms || alarms.length === 0) return;
 
-  const client = createSonosClientForUser(env, logger, userId);
+  const client = createSonosClient(env, logger);
+  const tokenStore = buildTokenStore(env, logger, userId);
   const nowMs = Date.now();
 
   for (const alarm of alarms) {
@@ -64,7 +60,7 @@ async function adjustVolumeLevelsForUser(env, logger, userId, store) {
 
     logger("info", "adjusting alarm volume", { userId, alarmId: alarm.alarmId, newVolume: alarm.volume });
     for (const groupId of alarm.groupIds) {
-      await client.setVolume(groupId, alarm.volume);
+      await client.setVolume(groupId, alarm.volume, tokenStore);
     }
   }
 
@@ -78,32 +74,29 @@ export default {
     const logger = createLogger();
     const url = new URL(request.url);
     const sessions = new SessionManager(env.TOKEN_KV);
+    const client = createSonosClient(env, logger);
 
     if (url.pathname === "/auth/status") {
       const userId = await sessions.getUserId(request);
       if (!userId) {
         return Response.json({ authenticated: false });
       }
-      const client = createSonosClientForUser(env, logger, userId);
-      return Response.json({ authenticated: await client.isAuthenticated() });
+      const tokenStore = buildTokenStore(env, logger, userId);
+      return Response.json({ authenticated: await client.isAuthenticated(tokenStore) });
     }
 
     if (url.pathname === "/auth/start") {
-      const tempStore = new MemoryTokenStore();
-      const client = createSonosClient(env, logger, tempStore);
       return Response.redirect(client.getAuthUrl(env, url), 302);
     }
 
     if (url.pathname === "/auth/callback") {
       const code = url.searchParams.get("code");
 
-      // Exchange code using a temporary in-memory token store
-      const tempStore = new MemoryTokenStore();
-      const tempClient = createSonosClient(env, logger, tempStore);
-      const tokenSet = await tempClient.authenticateWithAuthCode(code, env, url);
+      // Exchange code for tokens
+      const tokenSet = await client.authenticateWithAuthCode(code, env, url);
 
-      // Derive userId from household
-      const households = await tempClient.getHouseholds();
+      // Derive userId from household using the fresh access token
+      const households = await client.getHouseholds(tokenSet.access_token);
       const first = households[0];
       if (!first) {
         return new Response("No Sonos households found.", { status: 400 });
