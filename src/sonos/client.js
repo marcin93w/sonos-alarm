@@ -146,7 +146,6 @@ class SonosClient {
 
   async requestToken(body, fallbackRefreshToken) {
     const tokenUrl = `${this.oauthBase}/login/v3/oauth/access`;
-    console.log("requestToken", { url: tokenUrl, body: body.toString() });
     const response = await this.http.request(
       tokenUrl,
       {
@@ -159,7 +158,9 @@ class SonosClient {
       }
     );
     const data = await response.json().catch(() => ({}));
+    
     console.log("requestToken response", { status: response.status, data });
+    
     if (!response.ok) {
       throw new HttpError(
         data?.error === "invalid_grant" ? "Refresh token revoked" : "Token request failed",
@@ -167,6 +168,7 @@ class SonosClient {
         data
       );
     }
+    
     const now = Math.floor(Date.now() / 1000);
     return {
       access_token: data.access_token,
