@@ -82,8 +82,8 @@ test("Alarm.fromSonosAlarm maps core fields", () => {
 test("Alarm.fromSonosAlarm maps start time correctly to UTC", () => {
   const result = Alarm.fromSonosAlarm(alarm, groups);
 
-  assert.equal(result.startTime.getHours(), 8);
-  assert.equal(result.startTime.getMinutes(), 7);
+  assert.equal(result.startTime.getUTCHours(), 8);
+  assert.equal(result.startTime.getUTCMinutes(), 7);
 });
 
 test("Alarm.fromSonosAlarm maps groups correctly", () => {

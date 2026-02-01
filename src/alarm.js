@@ -45,11 +45,16 @@ class Alarm {
 
     static #convertSonosCETTimeToUTC(sonosTimeStr, referenceMs) {
         const referenceDate = new Date(referenceMs);
-        referenceDate.setMilliseconds(0);
-
-        const timeDifference = new Date(referenceDate.toLocaleString("en-US", { timeZone: "Europe/Paris" })) - referenceDate;
-        
-        return new Date(new Date(sonosTimeStr) - timeDifference);
+        const parts = new Intl.DateTimeFormat("en-US", {
+            timeZone: "Europe/Paris",
+            year: "numeric", month: "numeric", day: "numeric",
+            hour: "numeric", minute: "numeric", second: "numeric",
+            hour12: false,
+        }).formatToParts(referenceDate);
+        const get = (type) => parseInt(parts.find(p => p.type === type).value);
+        const cetAsUtcMs = Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
+        const offsetMs = cetAsUtcMs - referenceDate.getTime();
+        return new Date(new Date(sonosTimeStr).getTime() - offsetMs);
     }
         
     static #findGroupIdsForAlarm(alarm, groups) {
