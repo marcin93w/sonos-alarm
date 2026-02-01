@@ -61,7 +61,7 @@ class SonosClient {
     this.http = config.httpClient;
   }
 
-  async getAuthUrl(env) {
+  getAuthUrl(env) {
     const redirectUri = env.SONOS_REDIRECT_URI || `${url.origin}/auth/callback`;
     const params = new URLSearchParams({
       client_id: env.SONOS_CLIENT_ID,
