@@ -140,8 +140,10 @@ class SonosClient {
   }
 
   async requestToken(body, fallbackRefreshToken) {
+    const tokenUrl = `${this.oauthBase}/login/v3/oauth/access`;
+    console.log("requestToken", { url: tokenUrl, body: body.toString() });
     const response = await this.http.request(
-      `${this.oauthBase}/login/v3/oauth/access`,
+      tokenUrl,
       {
         method: "POST",
         headers: {
@@ -152,6 +154,7 @@ class SonosClient {
       }
     );
     const data = await response.json().catch(() => ({}));
+    console.log("requestToken response", { status: response.status, data });
     if (!response.ok) {
       if (data?.error === "invalid_grant") {
         await this.tokenStore.clear();
