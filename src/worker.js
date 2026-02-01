@@ -91,7 +91,7 @@ export default {
     if (url.pathname === "/auth/start") {
       const tempStore = new MemoryTokenStore();
       const client = createSonosClient(env, logger, tempStore);
-      return Response.redirect(client.getAuthUrl(env), 302);
+      return Response.redirect(client.getAuthUrl(env, url), 302);
     }
 
     if (url.pathname === "/auth/callback") {
@@ -100,7 +100,7 @@ export default {
       // Exchange code using a temporary in-memory token store
       const tempStore = new MemoryTokenStore();
       const tempClient = createSonosClient(env, logger, tempStore);
-      const tokenSet = await tempClient.authenticateWithAuthCode(code, env);
+      const tokenSet = await tempClient.authenticateWithAuthCode(code, env, url);
 
       // Derive userId from household
       const households = await tempClient.getHouseholds();

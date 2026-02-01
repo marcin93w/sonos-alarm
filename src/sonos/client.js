@@ -61,8 +61,8 @@ class SonosClient {
     this.http = config.httpClient;
   }
 
-  getAuthUrl(env) {
-    const redirectUri = env.SONOS_REDIRECT_URI || `${url.origin}/auth/callback`;
+  getAuthUrl(env, requestUrl) {
+    const redirectUri = env.SONOS_REDIRECT_URI || `${requestUrl.origin}/auth/callback`;
     const params = new URLSearchParams({
       client_id: env.SONOS_CLIENT_ID,
       response_type: "code",
@@ -73,8 +73,8 @@ class SonosClient {
     return `${this.oauthBase}/login/v3/oauth?${params.toString()}`;
   }
 
-  async authenticateWithAuthCode(code, env) {
-    const redirectUri = env.SONOS_REDIRECT_URI || `${url.origin}/auth/callback`;
+  async authenticateWithAuthCode(code, env, requestUrl) {
+    const redirectUri = env.SONOS_REDIRECT_URI || `${requestUrl.origin}/auth/callback`;
     const body = new URLSearchParams({
       grant_type: "authorization_code",
       code,
