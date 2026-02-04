@@ -2,6 +2,7 @@ import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
 import { buildAlarmStore } from "./alarm-store.js";
 import { buildAlarmConfigStore, ALARM_CONFIG_DEFAULTS } from "./alarm-config-store.js";
+import { buildTimezoneStore } from "./timezone-store.js";
 import { buildTokenStore } from "./sonos/token-store.js";
 import { createLogger } from "./logger.js";
 import { Alarm } from "./alarm.js";
@@ -26,7 +27,7 @@ function createSonosClient(env, logger) {
   });
 }
 
-async function refreshAlarmsForUser(env, logger, userId, store, force = false) {
+async function refreshAlarmsForUser(env, logger, userId, store, force = false, timezone) {
   const shouldRefresh = await store.shouldRefresh();
   if (!shouldRefresh && !force) {
     return;
@@ -41,7 +42,7 @@ async function refreshAlarmsForUser(env, logger, userId, store, force = false) {
 
   const alarmsData = await client.getHouseholdAlarms(householdId, tokenStore);
   const groupsData = await client.getGroups(householdId, tokenStore);
-  const alarms = alarmsData.map((alarm) => Alarm.fromSonosAlarm(alarm, groupsData));
+  const alarms = alarmsData.map((alarm) => Alarm.fromSonosAlarm(alarm, groupsData, undefined, timezone));
   await store.saveAlarms(alarms);
 
   logger("info", "alarms refreshed", { userId, householdId, count: alarms.length });
@@ -84,7 +85,10 @@ export default {
         return Response.json({ authenticated: false });
       }
       const tokenStore = buildTokenStore(env, logger, userId);
-      return Response.json({ authenticated: await client.isAuthenticated(tokenStore) });
+      const authenticated = await client.isAuthenticated(tokenStore);
+      const timezoneStore = buildTimezoneStore(env, userId);
+      const timezone = await timezoneStore.getTimezone();
+      return Response.json({ authenticated, isTimezoneConfigured: !!timezone });
     }
 
     if (url.pathname === "/auth/start") {
@@ -138,6 +142,26 @@ export default {
       });
     }
 
+    if (url.pathname === "/timezone" && request.method === "PUT") {
+      const userId = await sessions.getUserId(request);
+      if (!userId) {
+        return Response.json({ error: "Not authenticated" }, { status: 401 });
+      }
+      const body = await request.json();
+      const { timezone } = body;
+      if (!timezone || typeof timezone !== "string") {
+        return Response.json({ error: "timezone is required" }, { status: 400 });
+      }
+      try {
+        Intl.DateTimeFormat(undefined, { timeZone: timezone });
+      } catch {
+        return Response.json({ error: "Invalid timezone" }, { status: 400 });
+      }
+      const timezoneStore = buildTimezoneStore(env, userId);
+      await timezoneStore.saveTimezone(timezone);
+      return Response.json({ ok: true });
+    }
+
     if (url.pathname === "/alarms") {
       const userId = await sessions.getUserId(request);
       if (!userId) {
@@ -145,7 +169,9 @@ export default {
       }
 
       const store = buildAlarmStore(env, logger, userId);
-      await refreshAlarmsForUser(env, logger, userId, store, true);
+      const timezoneStore = buildTimezoneStore(env, userId);
+      const timezone = await timezoneStore.getTimezone();
+      await refreshAlarmsForUser(env, logger, userId, store, true, timezone);
       const alarms = await store.getAlarms();
 
       return Response.json(alarms || []);
@@ -200,7 +226,9 @@ export default {
       try {
         const store = buildAlarmStore(env, logger, userId);
         const configStore = buildAlarmConfigStore(env, userId);
-        await refreshAlarmsForUser(env, logger, userId, store);
+        const timezoneStore = buildTimezoneStore(env, userId);
+        const timezone = await timezoneStore.getTimezone();
+        await refreshAlarmsForUser(env, logger, userId, store, false, timezone);
         await adjustVolumeLevelsForUser(env, logger, userId, store, configStore);
       } catch (err) {
         logger("error", "scheduled processing failed for user", {

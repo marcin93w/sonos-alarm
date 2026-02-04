@@ -88,9 +88,17 @@ test("Alarm.fromSonosAlarm maps core fields", () => {
 });
 
 test("Alarm.fromSonosAlarm maps start time correctly to UTC", () => {
-  const result = Alarm.fromSonosAlarm(alarm, groups);
+  const result = Alarm.fromSonosAlarm(alarm, groups, undefined, "Europe/Paris");
 
   assert.equal(result.startTime.getUTCHours(), 8);
+  assert.equal(result.startTime.getUTCMinutes(), 7);
+});
+
+test("Alarm.fromSonosAlarm maps start time correctly for US/Eastern timezone", () => {
+  const testTimeMs = Date.UTC(2026, 0, 30, 14, 17, 0);
+  const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs, "America/New_York");
+
+  assert.equal(result.startTime.getUTCHours(), 14);
   assert.equal(result.startTime.getUTCMinutes(), 7);
 });
 
@@ -104,7 +112,7 @@ test("Alarm.fromSonosAlarm maps groups correctly", () => {
 test("Alarm.adjustVolume computes volume based on minutes since start", () => {
   // Test time: 2026-01-30T09:17:00 CET (10 min after alarm start at 09:07)
   const testTimeMs = Date.UTC(2026, 0, 30, 8, 17, 0);
-  const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs);
+  const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs, "Europe/Paris");
   const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, true);
@@ -114,7 +122,7 @@ test("Alarm.adjustVolume computes volume based on minutes since start", () => {
 test("Alarm.adjustVolume computes volume based on minutes since start during daylight saving", () => {
   // Test time: 2026-06-30T09:17:00 CEST (10 min after alarm start at 09:07)
   const testTimeMs = Date.UTC(2026, 5, 30, 7, 17, 0);
-  const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs);
+  const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs, "Europe/Paris");
   const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, true);

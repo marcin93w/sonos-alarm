@@ -20,10 +20,11 @@ Sonos Alarm is a Cloudflare Workers application that manages Sonos speaker alarm
 **Entry point:** `src/worker.js` — exports `fetch` (HTTP handler) and `scheduled` (cron handler)
 
 **Backend components (`src/`):**
-- `worker.js` — Routes requests to `/auth/*`, `/alarms`, and `/alarm-config` endpoints, serves static assets, runs scheduled alarm adjustments
+- `worker.js` — Routes requests to `/auth/*`, `/alarms`, `/alarm-config`, and `/timezone` endpoints, serves static assets, runs scheduled alarm adjustments
 - `alarm.js` — Alarm domain model with volume ramp calculation (linear interpolation from `initialVolume` to `maxVolume` over configurable duration). `initialVolume` is set from the Sonos alarm's own volume at creation time. `groupNames` is a comma-separated string of human-readable group names resolved from Sonos groups data at creation time.
 - `alarm-store.js` — Alarm persistence with abstract base, KV and in-memory implementations (8h TTL)
 - `alarm-config-store.js` — Per-alarm config persistence (rampEnabled, maxVolume, rampDuration) in KV key `user:{userId}:alarm-config`, no TTL
+- `timezone-store.js` — Per-user timezone persistence in KV key `user:{userId}:timezone`, no TTL. Auto-detected from browser on first use.
 - `session.js` — Cookie-based session management (maps session ID → user ID in KV)
 - `user-registry.js` — Tracks registered user IDs in a single KV entry for cron iteration
 - `sonos/client.js` — Sonos Control API wrapper with OAuth token management
@@ -45,7 +46,7 @@ Sonos Alarm is a Cloudflare Workers application that manages Sonos speaker alarm
 - **Dependency injection** in constructors throughout
 - **Abstract base classes** (`AlarmStore`, `AlarmConfigStore`, `TokenStore`) with KV and memory implementations
 - **Private methods** use `#` syntax
-- **Timezone handling:** Sonos returns CET times; converted to UTC using `Intl.DateTimeFormat` with `Europe/Paris`
+- **Timezone handling:** Sonos returns local times; converted to UTC using `Intl.DateTimeFormat` with the user's configured timezone (auto-detected from browser, stored in KV, defaults to `Europe/Paris`)
 
 ## Environment Variables
 

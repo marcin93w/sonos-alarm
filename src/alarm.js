@@ -38,20 +38,20 @@ class Alarm {
         };
     }
 
-    static fromSonosAlarm(alarm, groups, nowMs = Date.now()) {
+    static fromSonosAlarm(alarm, groups, nowMs = Date.now(), timezone = "Europe/Paris") {
         const alarmId = alarm.alarmId || (() => { throw new Error("Alarm must have an alarmId"); })();
         const enabled = Boolean(alarm.enabled);
         const volume = parseInt(alarm.description.actuator.volume || (() => { throw new Error("Alarm actuator must have a volume"); })());
         const recurrenceDays = alarm.description?.recurrence?.days || [];
-        const startTime = Alarm.#convertSonosCETTimeToUTC(alarm.description.startTime, nowMs);
+        const startTime = Alarm.#convertSonosLocalTimeToUTC(alarm.description.startTime, nowMs, timezone);
         const { groupIds, groupNames } = Alarm.#findGroupsForAlarm(alarm, groups);
         return new Alarm(alarmId, enabled, groupIds, groupNames, volume, volume, recurrenceDays, startTime);
     }
 
-    static #convertSonosCETTimeToUTC(sonosTimeStr, referenceMs) {
+    static #convertSonosLocalTimeToUTC(sonosTimeStr, referenceMs, timezone) {
         const referenceDate = new Date(referenceMs);
         const parts = new Intl.DateTimeFormat("en-US", {
-            timeZone: "Europe/Paris",
+            timeZone: timezone,
             year: "numeric", month: "numeric", day: "numeric",
             hour: "numeric", minute: "numeric", second: "numeric",
             hour12: false,

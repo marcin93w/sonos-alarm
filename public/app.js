@@ -1,4 +1,4 @@
-import { getAuthStatus, getAlarms, getAlarmConfig, saveAlarmConfig } from "./api.js";
+import { getAuthStatus, getAlarms, getAlarmConfig, saveAlarmConfig, saveTimezone } from "./api.js";
 import {
   renderAlarms,
   hideAlarms,
@@ -12,6 +12,9 @@ async function updateAuthStatus() {
     const data = await getAuthStatus();
     if (data && data.authenticated) {
       setConnectVisible(false);
+      if (!data.isTimezoneConfigured) {
+        await saveTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+      }
       const [alarmsResponse, configResponse] = await Promise.all([getAlarms(), getAlarmConfig()]);
       const alarms = Array.isArray(alarmsResponse)
         ? alarmsResponse

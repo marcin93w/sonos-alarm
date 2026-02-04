@@ -22,6 +22,18 @@ export async function getAlarmConfig() {
   return response.json();
 }
 
+export async function saveTimezone(timezone) {
+  const response = await fetch("/timezone", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ timezone }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to save timezone");
+  }
+  return response.json();
+}
+
 export async function saveAlarmConfig(alarmId, config) {
   const response = await fetch("/alarm-config", {
     method: "PUT",
