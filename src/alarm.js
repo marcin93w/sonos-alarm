@@ -1,13 +1,12 @@
 import { ALARM_CONFIG_DEFAULTS } from "./alarm-config-store.js";
 
-const VOLUME_MIN = 1;
-
 class Alarm {
-    constructor(alarmId, enabled, groupIds, volume, recurrenceDays, startTime) {
+    constructor(alarmId, enabled, groupIds, volume, initialVolume, recurrenceDays, startTime) {
         this.alarmId = alarmId;
         this.enabled = enabled;
         this.groupIds = groupIds;
         this.volume = volume;
+        this.initialVolume = initialVolume;
         this.recurrenceDays = recurrenceDays;
         this.startTime = startTime;
     }
@@ -18,6 +17,7 @@ class Alarm {
             obj.enabled,
             obj.groupIds,
             obj.volume,
+            obj.initialVolume,
             obj.recurrenceDays,
             new Date(obj.startTime)
         );
@@ -29,6 +29,7 @@ class Alarm {
             enabled: this.enabled,
             groupIds: this.groupIds,
             volume: this.volume,
+            initialVolume: this.initialVolume,
             recurrenceDays: this.recurrenceDays,
             startTime: this.startTime.toISOString(),
         };
@@ -41,7 +42,7 @@ class Alarm {
         const recurrenceDays = alarm.description?.recurrence?.days || [];
         const startTime = Alarm.#convertSonosCETTimeToUTC(alarm.description.startTime, nowMs);
         const groupIds = Alarm.#findGroupIdsForAlarm(alarm, groups);
-        return new Alarm(alarmId, enabled, groupIds, volume, recurrenceDays, startTime);
+        return new Alarm(alarmId, enabled, groupIds, volume, volume, recurrenceDays, startTime);
     }
 
     static #convertSonosCETTimeToUTC(sonosTimeStr, referenceMs) {
@@ -79,7 +80,7 @@ class Alarm {
         if (minutes === null || minutes === undefined) return false;
         if (minutes < 0 || minutes > config.rampDuration) return false;
 
-        const volume = Alarm.#volumeForMinutes(minutes, VOLUME_MIN, config.maxVolume, config.rampDuration);
+        const volume = Alarm.#volumeForMinutes(minutes, this.initialVolume, config.maxVolume, config.rampDuration);
         if (this.volume === volume) {
             return false;
         }
@@ -150,12 +151,12 @@ class Alarm {
         return Math.floor((nowMs - occurrenceMs) / 60000);
     }
 
-    static #volumeForMinutes(minutes, volumeMin, volumeMax, rampDuration) {
+    static #volumeForMinutes(minutes, initialVolume, volumeMax, rampDuration) {
         const clamped = Math.max(0, Math.min(rampDuration, minutes));
-        if (clamped === 0) return volumeMin;
+        if (clamped === 0) return initialVolume;
         if (clamped === rampDuration) return volumeMax;
         const ratio = clamped / rampDuration;
-        const volume = volumeMin + (volumeMax - volumeMin) * ratio;
+        const volume = initialVolume + (volumeMax - initialVolume) * ratio;
         return Math.round(volume);
     }
 }

@@ -59,6 +59,7 @@ function createRampAlarm({
   alarmId = "1",
   enabled = true,
   volume = 4,
+  initialVolume,
   recurrenceDays = ["MO", "TU", "TH", "FR"],
   startTime = "1970-01-01T09:00:00Z",
 } = {}) {
@@ -67,6 +68,7 @@ function createRampAlarm({
     enabled,
     ["groupId"],
     volume,
+    initialVolume ?? volume,
     recurrenceDays,
     new Date(startTime)
   );
@@ -79,6 +81,7 @@ test("Alarm.fromSonosAlarm maps core fields", () => {
   assert.equal(result.alarmId, "126");
   assert.equal(result.enabled, true);
   assert.equal(result.volume, 9);
+  assert.equal(result.initialVolume, 9);
   assert.deepEqual(result.recurrenceDays, ["MO", "TU", "TH", "FR"]);
 });
 
@@ -96,23 +99,23 @@ test("Alarm.fromSonosAlarm maps groups correctly", () => {
 });
 
 test("Alarm.adjustVolume computes volume based on minutes since start", () => {
-  // Test time: 2026-01-30T09:10:00 CET
-  const testTimeMs = Date.UTC(2026, 0, 30, 8, 10, 0);
+  // Test time: 2026-01-30T09:17:00 CET (10 min after alarm start at 09:07)
+  const testTimeMs = Date.UTC(2026, 0, 30, 8, 17, 0);
   const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs);
   const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, true);
-  assert.equal(result.volume, 2);
+  assert.equal(result.volume, 10); // 9 + (15-9)*(10/60) = 10
 });
 
 test("Alarm.adjustVolume computes volume based on minutes since start during daylight saving", () => {
-  // Test time: 2026-06-30T09:10:00 CET
-  const testTimeMs = Date.UTC(2026, 5, 30, 7, 10, 0);
+  // Test time: 2026-06-30T09:17:00 CEST (10 min after alarm start at 09:07)
+  const testTimeMs = Date.UTC(2026, 5, 30, 7, 17, 0);
   const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs);
   const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, true);
-  assert.equal(result.volume, 2);
+  assert.equal(result.volume, 10); // 9 + (15-9)*(10/60) = 10
 });
 
 test("Alarm.adjustVolume returns false when alarm is not enabled", () => {
@@ -151,16 +154,16 @@ test("Alarm.adjustVolume runs every day when recurrence days are empty", () => {
   const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, true);
-  assert.equal(result.volume, 3);
+  assert.equal(result.volume, 6); // 4 + (15-4)*(10/60) ≈ 5.83 → 6
 });
 
-test("Alarm.adjustVolume starts with VOLUME_MIN", () => {
+test("Alarm.adjustVolume starts with initialVolume", () => {
   const result = createRampAlarm();
-  const nowMs = Date.UTC(2026, 0, 26, 9, 1, 0);
+  const nowMs = Date.UTC(2026, 0, 26, 9, 0, 0);
   const changed = result.adjustVolume(nowMs, defaultConfig);
 
-  assert.equal(changed, true);
-  assert.equal(result.volume, 1);
+  assert.equal(changed, false);
+  assert.equal(result.volume, 4); // initialVolume = 4, no change at t=0
 });
 
 test("Alarm.adjustVolume reaches VOLUME_MAX after hour", () => {
@@ -178,17 +181,17 @@ test("Alarm.adjustVolume reaches mid volume after half an hour", () => {
   const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 10, rampDuration: 60 });
 
   assert.equal(changed, true);
-  assert.equal(result.volume, 6);
+  assert.equal(result.volume, 7); // 4 + (10-4)*0.5 = 7
 });
 
 test("Alarm.adjustVolume returns false when volume is not changed", () => {
   const result = createRampAlarm();
-  result.volume = 4;
+  result.volume = 6;
 
   const nowMs = Date.UTC(2026, 0, 26, 9, 20, 0);
   const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 10, rampDuration: 60 });
 
-  assert.equal(result.volume, 4);
+  assert.equal(result.volume, 6); // 4 + (10-4)*(20/60) = 6
   assert.equal(changed, false);
 });
 
@@ -224,7 +227,7 @@ test("Alarm.adjustVolume mid-ramp interpolation with custom duration", () => {
   const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 21, rampDuration: 30 });
 
   assert.equal(changed, true);
-  assert.equal(result.volume, 11); // 1 + (21-1)*0.5 = 11
+  assert.equal(result.volume, 13); // 4 + (21-4)*0.5 = 12.5 → 13
 });
 
 test("Alarm.adjustVolume custom maxVolume reaches target at 60 min", () => {
