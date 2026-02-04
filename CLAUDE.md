@@ -20,9 +20,10 @@ Sonos Alarm is a Cloudflare Workers application that manages Sonos speaker alarm
 **Entry point:** `src/worker.js` — exports `fetch` (HTTP handler) and `scheduled` (cron handler)
 
 **Backend components (`src/`):**
-- `worker.js` — Routes requests to `/auth/*` and `/alarms` endpoints, serves static assets, runs scheduled alarm adjustments
-- `alarm.js` — Alarm domain model with volume ramp calculation (linear interpolation over 60 min)
+- `worker.js` — Routes requests to `/auth/*`, `/alarms`, and `/alarm-config` endpoints, serves static assets, runs scheduled alarm adjustments
+- `alarm.js` — Alarm domain model with volume ramp calculation (linear interpolation over configurable duration)
 - `alarm-store.js` — Alarm persistence with abstract base, KV and in-memory implementations (8h TTL)
+- `alarm-config-store.js` — Per-alarm config persistence (rampEnabled, maxVolume, rampDuration) in KV key `user:{userId}:alarm-config`, no TTL
 - `session.js` — Cookie-based session management (maps session ID → user ID in KV)
 - `user-registry.js` — Tracks registered user IDs in a single KV entry for cron iteration
 - `sonos/client.js` — Sonos Control API wrapper with OAuth token management
@@ -30,11 +31,11 @@ Sonos Alarm is a Cloudflare Workers application that manages Sonos speaker alarm
 - `sonos/token-store.js` — OAuth token persistence (KV and in-memory implementations)
 - `logger.js` — Console logger with automatic secret redaction
 
-**Frontend (`public/`):** Vanilla JS, no framework. `app.js` checks auth status, fetches/renders alarms. `api.js` provides fetch helpers. `ui.js` handles DOM rendering.
+**Frontend (`public/`):** Vanilla JS, no framework. `app.js` checks auth status, fetches/renders alarms and per-alarm config. `api.js` provides fetch helpers. `ui.js` handles DOM rendering including per-alarm config controls.
 
 **Key flow — Scheduled cron:**
 1. Fetches all user IDs from `UserRegistry`
-2. For each user: refreshes alarms from Sonos API (if TTL expired), calculates volume based on minutes since alarm start, calls Sonos API to set volume
+2. For each user: refreshes alarms from Sonos API (if TTL expired), loads per-alarm config, calculates volume based on minutes since alarm start and config (rampEnabled, maxVolume, rampDuration), calls Sonos API to set volume
 
 **Key flow — OAuth:**
 `/auth/start` → Sonos OAuth → `/auth/callback` (exchanges code for tokens, creates session, registers user)
@@ -42,7 +43,7 @@ Sonos Alarm is a Cloudflare Workers application that manages Sonos speaker alarm
 ## Code Patterns
 
 - **Dependency injection** in constructors throughout
-- **Abstract base classes** (`AlarmStore`, `TokenStore`) with KV and memory implementations
+- **Abstract base classes** (`AlarmStore`, `AlarmConfigStore`, `TokenStore`) with KV and memory implementations
 - **Private methods** use `#` syntax
 - **Timezone handling:** Sonos returns CET times; converted to UTC using `Intl.DateTimeFormat` with `Europe/Paris`
 
@@ -56,3 +57,4 @@ Optional: `SONOS_OAUTH_BASE`, `SONOS_API_BASE`, `SONOS_REDIRECT_URI`, `HTTP_TIME
 
 This is a simple pet-project proof-of-concept application. Code simplicity matters the most. It is ok to not cover all the edge cases, especially if it would complicate the code too much.
 Unit tests are reqired only for the business logic part. Integration is tested manually.
+Avoid obvious code comments.
