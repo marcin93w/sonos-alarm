@@ -48,9 +48,7 @@ export function renderAlarms(alarms, configs, onConfigSave) {
       const days = formatDays(alarm && alarm.recurrenceDays);
       const volume =
         alarm && Number.isFinite(alarm.volume) ? alarm.volume : null;
-      const groupIds = Array.isArray(alarm && alarm.groupIds)
-        ? alarm.groupIds.join(", ")
-        : "";
+      const groupIds = (alarm && alarm.groupNames) || "";
 
       const header = document.createElement("div");
       header.className = "alarm-header";

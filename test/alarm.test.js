@@ -67,6 +67,7 @@ function createRampAlarm({
     alarmId,
     enabled,
     ["groupId"],
+    "",
     volume,
     initialVolume ?? volume,
     recurrenceDays,
@@ -82,6 +83,7 @@ test("Alarm.fromSonosAlarm maps core fields", () => {
   assert.equal(result.enabled, true);
   assert.equal(result.volume, 9);
   assert.equal(result.initialVolume, 9);
+  assert.equal(result.groupNames, "Głośnik");
   assert.deepEqual(result.recurrenceDays, ["MO", "TU", "TH", "FR"]);
 });
 
@@ -96,6 +98,7 @@ test("Alarm.fromSonosAlarm maps groups correctly", () => {
   const result = Alarm.fromSonosAlarm(alarm, groups);
 
   assert.deepEqual(result.groupIds, ["RINCON_542A1B595D5001400:542642962"]);
+  assert.equal(result.groupNames, "Głośnik");
 });
 
 test("Alarm.adjustVolume computes volume based on minutes since start", () => {

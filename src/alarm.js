@@ -1,10 +1,11 @@
 import { ALARM_CONFIG_DEFAULTS } from "./alarm-config-store.js";
 
 class Alarm {
-    constructor(alarmId, enabled, groupIds, volume, initialVolume, recurrenceDays, startTime) {
+    constructor(alarmId, enabled, groupIds, groupNames, volume, initialVolume, recurrenceDays, startTime) {
         this.alarmId = alarmId;
         this.enabled = enabled;
         this.groupIds = groupIds;
+        this.groupNames = groupNames;
         this.volume = volume;
         this.initialVolume = initialVolume;
         this.recurrenceDays = recurrenceDays;
@@ -16,6 +17,7 @@ class Alarm {
             obj.alarmId,
             obj.enabled,
             obj.groupIds,
+            obj.groupNames || "",
             obj.volume,
             obj.initialVolume,
             obj.recurrenceDays,
@@ -28,6 +30,7 @@ class Alarm {
             alarmId: this.alarmId,
             enabled: this.enabled,
             groupIds: this.groupIds,
+            groupNames: this.groupNames,
             volume: this.volume,
             initialVolume: this.initialVolume,
             recurrenceDays: this.recurrenceDays,
@@ -41,8 +44,8 @@ class Alarm {
         const volume = parseInt(alarm.description.actuator.volume || (() => { throw new Error("Alarm actuator must have a volume"); })());
         const recurrenceDays = alarm.description?.recurrence?.days || [];
         const startTime = Alarm.#convertSonosCETTimeToUTC(alarm.description.startTime, nowMs);
-        const groupIds = Alarm.#findGroupIdsForAlarm(alarm, groups);
-        return new Alarm(alarmId, enabled, groupIds, volume, volume, recurrenceDays, startTime);
+        const { groupIds, groupNames } = Alarm.#findGroupsForAlarm(alarm, groups);
+        return new Alarm(alarmId, enabled, groupIds, groupNames, volume, volume, recurrenceDays, startTime);
     }
 
     static #convertSonosCETTimeToUTC(sonosTimeStr, referenceMs) {
@@ -59,17 +62,19 @@ class Alarm {
         return new Date(new Date(sonosTimeStr).getTime() - offsetMs);
     }
         
-    static #findGroupIdsForAlarm(alarm, groups) {
+    static #findGroupsForAlarm(alarm, groups) {
         const actuatorId = alarm.description.actuator.id || (() => { throw new Error("Alarm actuator must have an id"); })();
-        
-        const ids = new Set();
+
+        const ids = [];
+        const names = [];
         for (const group of groups) {
-            const groupIds = [group.id, group.coordinatorId, ...(group.playerIds || [])].filter(Boolean);
-            if (groupIds.includes(actuatorId) && group.id) {
-                ids.add(group.id);
+            const memberIds = [group.id, group.coordinatorId, ...(group.playerIds || [])].filter(Boolean);
+            if (memberIds.includes(actuatorId) && group.id) {
+                ids.push(group.id);
+                names.push(group.name || group.id);
             }
         }
-        return Array.from(ids);
+        return { groupIds: ids, groupNames: names.join(", ") };
     }
 
     adjustVolume(nowMs, config = ALARM_CONFIG_DEFAULTS) {
