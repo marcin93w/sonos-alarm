@@ -16,7 +16,7 @@ class AlarmStore {
 }
 
 class MemoryAlarmStore extends AlarmStore {
-  ttlMs = 8 * 60 * 60 * 1000; // 8 hours
+  ttlMs = 6 * 60 * 60 * 1000; // 6 hours
   lastSavedDate = new Date(0);
 
   constructor() {
@@ -42,7 +42,7 @@ class MemoryAlarmStore extends AlarmStore {
 }
 
 class KvAlarmStore extends AlarmStore {
-  constructor(kv, userId, ttlMs = 8 * 60 * 60 * 1000) {
+  constructor(kv, userId, ttlMs = 6 * 60 * 60 * 1000) {
     super();
     this.kv = kv;
     this.key = `user:${userId}:alarms`;
