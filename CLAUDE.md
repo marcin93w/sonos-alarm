@@ -21,7 +21,7 @@ Sonos Alarm is a Cloudflare Workers application that manages Sonos speaker alarm
 
 **Backend components (`src/`):**
 - `worker.js` — Routes requests to `/auth/*`, `/alarms`, and `/alarm-config` endpoints, serves static assets, runs scheduled alarm adjustments
-- `alarm.js` — Alarm domain model with volume ramp calculation (linear interpolation over configurable duration)
+- `alarm.js` — Alarm domain model with volume ramp calculation (linear interpolation from `initialVolume` to `maxVolume` over configurable duration). `initialVolume` is set from the Sonos alarm's own volume at creation time.
 - `alarm-store.js` — Alarm persistence with abstract base, KV and in-memory implementations (8h TTL)
 - `alarm-config-store.js` — Per-alarm config persistence (rampEnabled, maxVolume, rampDuration) in KV key `user:{userId}:alarm-config`, no TTL
 - `session.js` — Cookie-based session management (maps session ID → user ID in KV)
@@ -35,7 +35,7 @@ Sonos Alarm is a Cloudflare Workers application that manages Sonos speaker alarm
 
 **Key flow — Scheduled cron:**
 1. Fetches all user IDs from `UserRegistry`
-2. For each user: refreshes alarms from Sonos API (if TTL expired), loads per-alarm config, calculates volume based on minutes since alarm start and config (rampEnabled, maxVolume, rampDuration), calls Sonos API to set volume
+2. For each user: refreshes alarms from Sonos API (if TTL expired), loads per-alarm config, calculates volume by ramping from the alarm's `initialVolume` to `maxVolume` over `rampDuration` minutes, calls Sonos API to set volume
 
 **Key flow — OAuth:**
 `/auth/start` → Sonos OAuth → `/auth/callback` (exchanges code for tokens, creates session, registers user)
