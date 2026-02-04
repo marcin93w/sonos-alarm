@@ -1,6 +1,7 @@
 import { SonosClient } from "./sonos/client.js";
 import { HttpClient } from "./sonos/http.js";
 import { buildAlarmStore } from "./alarm-store.js";
+import { buildAlarmConfigStore, ALARM_CONFIG_DEFAULTS } from "./alarm-config-store.js";
 import { buildTokenStore } from "./sonos/token-store.js";
 import { createLogger } from "./logger.js";
 import { Alarm } from "./alarm.js";
@@ -46,7 +47,7 @@ async function refreshAlarmsForUser(env, logger, userId, store, force = false) {
   logger("info", "alarms refreshed", { userId, householdId, count: alarms.length });
 }
 
-async function adjustVolumeLevelsForUser(env, logger, userId, store) {
+async function adjustVolumeLevelsForUser(env, logger, userId, store, configStore) {
   const alarms = await store.getAlarms();
   if (!alarms || alarms.length === 0) return;
 
@@ -55,7 +56,8 @@ async function adjustVolumeLevelsForUser(env, logger, userId, store) {
   const nowMs = Date.now();
 
   for (const alarm of alarms) {
-    const volumeChanged = alarm.adjustVolume(nowMs);
+    const config = await configStore.getConfig(alarm.alarmId);
+    const volumeChanged = alarm.adjustVolume(nowMs, config);
     if (!volumeChanged) continue;
 
     logger("info", "adjusting alarm volume", { userId, alarmId: alarm.alarmId, newVolume: alarm.volume });
@@ -149,6 +151,37 @@ export default {
       return Response.json(alarms || []);
     }
 
+    if (url.pathname === "/alarm-config" && request.method === "GET") {
+      const userId = await sessions.getUserId(request);
+      if (!userId) {
+        return Response.json({ error: "Not authenticated" }, { status: 401 });
+      }
+      const configStore = buildAlarmConfigStore(env, userId);
+      const configs = await configStore.getConfigs();
+      return Response.json({ configs, defaults: ALARM_CONFIG_DEFAULTS });
+    }
+
+    if (url.pathname === "/alarm-config" && request.method === "PUT") {
+      const userId = await sessions.getUserId(request);
+      if (!userId) {
+        return Response.json({ error: "Not authenticated" }, { status: 401 });
+      }
+      const body = await request.json();
+      const { alarmId, rampEnabled, maxVolume, rampDuration } = body;
+      if (!alarmId) {
+        return Response.json({ error: "alarmId is required" }, { status: 400 });
+      }
+      if (typeof rampEnabled !== "boolean" || typeof maxVolume !== "number" || typeof rampDuration !== "number") {
+        return Response.json({ error: "Invalid config values" }, { status: 400 });
+      }
+      if (maxVolume < 1 || maxVolume > 100 || rampDuration < 1 || rampDuration > 180) {
+        return Response.json({ error: "Values out of range" }, { status: 400 });
+      }
+      const configStore = buildAlarmConfigStore(env, userId);
+      await configStore.saveConfig(alarmId, { rampEnabled, maxVolume, rampDuration });
+      return Response.json({ ok: true });
+    }
+
     if (env.ASSETS) {
       return env.ASSETS.fetch(request);
     }
@@ -166,8 +199,9 @@ export default {
     for (const userId of userIds) {
       try {
         const store = buildAlarmStore(env, logger, userId);
+        const configStore = buildAlarmConfigStore(env, userId);
         await refreshAlarmsForUser(env, logger, userId, store);
-        await adjustVolumeLevelsForUser(env, logger, userId, store);
+        await adjustVolumeLevelsForUser(env, logger, userId, store, configStore);
       } catch (err) {
         logger("error", "scheduled processing failed for user", {
           userId,

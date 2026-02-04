@@ -114,6 +114,46 @@ p {
   font-style: italic;
 }
 
+.alarm-config {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 8px;
+  align-items: center;
+}
+
+.config-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.config-toggle input[type="checkbox"] {
+  accent-color: var(--accent);
+}
+
+.config-field {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.config-field input[type="number"] {
+  width: 56px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--page);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
 #status {
   margin-top: 12px;
   color: var(--muted);

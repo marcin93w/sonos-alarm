@@ -1,4 +1,4 @@
-import { getAuthStatus, getAlarms } from "./api.js";
+import { getAuthStatus, getAlarms, getAlarmConfig, saveAlarmConfig } from "./api.js";
 import {
   renderAlarms,
   hideAlarms,
@@ -12,13 +12,16 @@ async function updateAuthStatus() {
     const data = await getAuthStatus();
     if (data && data.authenticated) {
       setConnectVisible(false);
-      const alarmsResponse = await getAlarms();
+      const [alarmsResponse, configResponse] = await Promise.all([getAlarms(), getAlarmConfig()]);
       const alarms = Array.isArray(alarmsResponse)
         ? alarmsResponse
         : Array.isArray(alarmsResponse && alarmsResponse.alarms)
         ? alarmsResponse.alarms
         : [];
-      renderAlarms(alarms);
+      const configs = { ...configResponse.configs, defaults: configResponse.defaults };
+      renderAlarms(alarms, configs, (alarmId, config) => {
+        saveAlarmConfig(alarmId, config);
+      });
       setStatus("");
     } else {
       setConnectVisible(true);

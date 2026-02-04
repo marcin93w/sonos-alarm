@@ -1,6 +1,7 @@
-﻿import test from "node:test";
+import test from "node:test";
 import assert from "node:assert/strict";
 import { Alarm } from "../src/alarm.js";
+import { ALARM_CONFIG_DEFAULTS } from "../src/alarm-config-store.js";
 
 const alarm = {
   "_objectType": "alarm",
@@ -52,6 +53,8 @@ const groups = [{
   ]
 }];
 
+const defaultConfig = { rampEnabled: true, maxVolume: 15, rampDuration: 60 };
+
 function createRampAlarm({
   alarmId = "1",
   enabled = true,
@@ -96,7 +99,7 @@ test("Alarm.adjustVolume computes volume based on minutes since start", () => {
   // Test time: 2026-01-30T09:10:00 CET
   const testTimeMs = Date.UTC(2026, 0, 30, 8, 10, 0);
   const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs);
-  const changed = result.adjustVolume(testTimeMs, 1, 15);
+  const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, true);
   assert.equal(result.volume, 2);
@@ -106,7 +109,7 @@ test("Alarm.adjustVolume computes volume based on minutes since start during day
   // Test time: 2026-06-30T09:10:00 CET
   const testTimeMs = Date.UTC(2026, 5, 30, 7, 10, 0);
   const result = Alarm.fromSonosAlarm(alarm, groups, testTimeMs);
-  const changed = result.adjustVolume(testTimeMs, 1, 15);
+  const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, true);
   assert.equal(result.volume, 2);
@@ -115,7 +118,7 @@ test("Alarm.adjustVolume computes volume based on minutes since start during day
 test("Alarm.adjustVolume returns false when alarm is not enabled", () => {
   const result = createRampAlarm({ alarmId: "5", enabled: false });
   const testTimeMs = Date.UTC(2026, 0, 26, 9, 5, 0);
-  const changed = result.adjustVolume(testTimeMs, 1, 10);
+  const changed = result.adjustVolume(testTimeMs, { rampEnabled: true, maxVolume: 10, rampDuration: 60 });
 
   assert.equal(changed, false);
   assert.equal(result.volume, 4);
@@ -125,7 +128,7 @@ test("Alarm.adjustVolume returns false for days when alarm is not occuring", () 
   const result = Alarm.fromSonosAlarm(alarm, groups);
   // Test time: 2026-01-28T09:10:00 CET
   const testTimeMs = Date.UTC(2026, 0, 28, 8, 10, 0);
-  const changed = result.adjustVolume(testTimeMs, 1, 15);
+  const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, false);
   assert.equal(result.volume, 9);
@@ -135,7 +138,7 @@ test("Alarm.adjustVolume returns false for when alarm run more than 1 hour ago",
   const result = Alarm.fromSonosAlarm(alarm, groups);
   // Test time: 2026-01-30T10:10:00 CET (more than 1 hour after start)
   const testTimeMs = Date.UTC(2026, 0, 30, 9, 10, 0);
-  const changed = result.adjustVolume(testTimeMs, 1, 15);
+  const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, false);
   assert.equal(result.volume, 9);
@@ -145,7 +148,7 @@ test("Alarm.adjustVolume runs every day when recurrence days are empty", () => {
   const result = createRampAlarm({ recurrenceDays: [] });
   // Test time: 2026-01-29T10:10:00 CET
   const testTimeMs = Date.UTC(2026, 0, 29, 9, 10, 0);
-  const changed = result.adjustVolume(testTimeMs, 1, 15);
+  const changed = result.adjustVolume(testTimeMs, defaultConfig);
 
   assert.equal(changed, true);
   assert.equal(result.volume, 3);
@@ -153,8 +156,8 @@ test("Alarm.adjustVolume runs every day when recurrence days are empty", () => {
 
 test("Alarm.adjustVolume starts with VOLUME_MIN", () => {
   const result = createRampAlarm();
-  const nowMs = Date.UTC(2026, 0, 26, 9, 1, 0); // Monday, 2026-01-26T08:01:00Z // MO, 9:01 AM CET
-  const changed = result.adjustVolume(nowMs, 1, 15);
+  const nowMs = Date.UTC(2026, 0, 26, 9, 1, 0);
+  const changed = result.adjustVolume(nowMs, defaultConfig);
 
   assert.equal(changed, true);
   assert.equal(result.volume, 1);
@@ -162,8 +165,8 @@ test("Alarm.adjustVolume starts with VOLUME_MIN", () => {
 
 test("Alarm.adjustVolume reaches VOLUME_MAX after hour", () => {
   const result = createRampAlarm();
-  const nowMs = Date.UTC(2026, 0, 26, 10, 0, 0); // Monday, 2026-01-26T09:00:00Z // MO, 10:00 AM CET
-  const changed = result.adjustVolume(nowMs, 1, 15);
+  const nowMs = Date.UTC(2026, 0, 26, 10, 0, 0);
+  const changed = result.adjustVolume(nowMs, defaultConfig);
 
   assert.equal(changed, true);
   assert.equal(result.volume, 15);
@@ -171,8 +174,8 @@ test("Alarm.adjustVolume reaches VOLUME_MAX after hour", () => {
 
 test("Alarm.adjustVolume reaches mid volume after half an hour", () => {
   const result = createRampAlarm();
-  const nowMs = Date.UTC(2026, 0, 26, 9, 30, 0); // Monday, 2026-01-26T09:01:00Z // MO, 9:30 AM CET
-  const changed = result.adjustVolume(nowMs, 1, 10);
+  const nowMs = Date.UTC(2026, 0, 26, 9, 30, 0);
+  const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 10, rampDuration: 60 });
 
   assert.equal(changed, true);
   assert.equal(result.volume, 6);
@@ -182,9 +185,62 @@ test("Alarm.adjustVolume returns false when volume is not changed", () => {
   const result = createRampAlarm();
   result.volume = 4;
 
-  const nowMs = Date.UTC(2026, 0, 26, 9, 20, 0); // Monday, 2026-01-26T09:01:00Z // MO, 9:20 AM CET
-  const changed = result.adjustVolume(nowMs, 1, 10);
+  const nowMs = Date.UTC(2026, 0, 26, 9, 20, 0);
+  const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 10, rampDuration: 60 });
 
   assert.equal(result.volume, 4);
   assert.equal(changed, false);
+});
+
+test("Alarm.adjustVolume returns false when rampEnabled is false", () => {
+  const result = createRampAlarm();
+  const nowMs = Date.UTC(2026, 0, 26, 9, 10, 0);
+  const changed = result.adjustVolume(nowMs, { rampEnabled: false, maxVolume: 15, rampDuration: 60 });
+
+  assert.equal(changed, false);
+  assert.equal(result.volume, 4);
+});
+
+test("Alarm.adjustVolume reaches max at custom duration (30 min)", () => {
+  const result = createRampAlarm();
+  const nowMs = Date.UTC(2026, 0, 26, 9, 30, 0);
+  const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 20, rampDuration: 30 });
+
+  assert.equal(changed, true);
+  assert.equal(result.volume, 20);
+});
+
+test("Alarm.adjustVolume returns false past custom duration", () => {
+  const result = createRampAlarm();
+  const nowMs = Date.UTC(2026, 0, 26, 9, 31, 0);
+  const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 20, rampDuration: 30 });
+
+  assert.equal(changed, false);
+});
+
+test("Alarm.adjustVolume mid-ramp interpolation with custom duration", () => {
+  const result = createRampAlarm();
+  const nowMs = Date.UTC(2026, 0, 26, 9, 15, 0); // 15 min into 30 min ramp = halfway
+  const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 21, rampDuration: 30 });
+
+  assert.equal(changed, true);
+  assert.equal(result.volume, 11); // 1 + (21-1)*0.5 = 11
+});
+
+test("Alarm.adjustVolume custom maxVolume reaches target at 60 min", () => {
+  const result = createRampAlarm();
+  const nowMs = Date.UTC(2026, 0, 26, 10, 0, 0); // 60 min
+  const changed = result.adjustVolume(nowMs, { rampEnabled: true, maxVolume: 50, rampDuration: 60 });
+
+  assert.equal(changed, true);
+  assert.equal(result.volume, 50);
+});
+
+test("Alarm.adjustVolume default config (no arg) behaves same as defaults", () => {
+  const result = createRampAlarm();
+  const nowMs = Date.UTC(2026, 0, 26, 10, 0, 0);
+  const changed = result.adjustVolume(nowMs);
+
+  assert.equal(changed, true);
+  assert.equal(result.volume, ALARM_CONFIG_DEFAULTS.maxVolume);
 });

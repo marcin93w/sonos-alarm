@@ -1,5 +1,6 @@
+import { ALARM_CONFIG_DEFAULTS } from "./alarm-config-store.js";
+
 const VOLUME_MIN = 1;
-const VOLUME_MAX = 15;
 
 class Alarm {
     constructor(alarmId, enabled, groupIds, volume, recurrenceDays, startTime) {
@@ -70,13 +71,15 @@ class Alarm {
         return Array.from(ids);
     }
 
-    adjustVolume(nowMs, volumeMin = VOLUME_MIN, volumeMax = VOLUME_MAX) {
+    adjustVolume(nowMs, config = ALARM_CONFIG_DEFAULTS) {
+        if (!config.rampEnabled) return false;
+
         const minutes = this.#calculateMinutesFromStart(nowMs);
 
         if (minutes === null || minutes === undefined) return false;
-        if (minutes < 0 || minutes > 60) return false;
+        if (minutes < 0 || minutes > config.rampDuration) return false;
 
-        const volume = Alarm.#volumeForMinutes(minutes, volumeMin, volumeMax);
+        const volume = Alarm.#volumeForMinutes(minutes, VOLUME_MIN, config.maxVolume, config.rampDuration);
         if (this.volume === volume) {
             return false;
         }
@@ -147,11 +150,11 @@ class Alarm {
         return Math.floor((nowMs - occurrenceMs) / 60000);
     }
 
-    static #volumeForMinutes(minutes, volumeMin, volumeMax) {
-        const clamped = Math.max(0, Math.min(60, minutes));
+    static #volumeForMinutes(minutes, volumeMin, volumeMax, rampDuration) {
+        const clamped = Math.max(0, Math.min(rampDuration, minutes));
         if (clamped === 0) return volumeMin;
-        if (clamped === 60) return volumeMax;
-        const ratio = clamped / 60;
+        if (clamped === rampDuration) return volumeMax;
+        const ratio = clamped / rampDuration;
         const volume = volumeMin + (volumeMax - volumeMin) * ratio;
         return Math.round(volume);
     }

@@ -18,7 +18,7 @@ function formatDays(days) {
   return "";
 }
 
-export function renderAlarms(alarms) {
+export function renderAlarms(alarms, configs, onConfigSave) {
   const container = document.getElementById("alarms");
   const list = document.getElementById("alarms-list");
   if (!container || !list) return;
@@ -77,10 +77,65 @@ export function renderAlarms(alarms) {
 
       alarmItem.appendChild(header);
       if (meta.textContent) alarmItem.appendChild(meta);
+
+      if (configs && onConfigSave && alarm.alarmId) {
+        const cfg = configs[alarm.alarmId] || configs.defaults || {};
+        alarmItem.appendChild(renderAlarmConfig(alarm.alarmId, cfg, onConfigSave));
+      }
+
       list.appendChild(alarmItem);
     }
   }
   container.style.display = "block";
+}
+
+function renderAlarmConfig(alarmId, cfg, onConfigSave) {
+  const div = document.createElement("div");
+  div.className = "alarm-config";
+
+  const save = () => {
+    onConfigSave(alarmId, {
+      rampEnabled: toggle.checked,
+      maxVolume: parseInt(maxVol.value) || 15,
+      rampDuration: parseInt(duration.value) || 60,
+    });
+  };
+
+  const toggleLabel = document.createElement("label");
+  toggleLabel.className = "config-toggle";
+  const toggle = document.createElement("input");
+  toggle.type = "checkbox";
+  toggle.checked = cfg.rampEnabled !== false;
+  toggle.addEventListener("change", save);
+  toggleLabel.appendChild(toggle);
+  toggleLabel.append("Volume ramp");
+  div.appendChild(toggleLabel);
+
+  const maxVolField = document.createElement("label");
+  maxVolField.className = "config-field";
+  maxVolField.append("Max vol");
+  const maxVol = document.createElement("input");
+  maxVol.type = "number";
+  maxVol.min = 1;
+  maxVol.max = 100;
+  maxVol.value = cfg.maxVolume ?? 15;
+  maxVol.addEventListener("change", save);
+  maxVolField.appendChild(maxVol);
+  div.appendChild(maxVolField);
+
+  const durationField = document.createElement("label");
+  durationField.className = "config-field";
+  durationField.append("Ramp min");
+  const duration = document.createElement("input");
+  duration.type = "number";
+  duration.min = 1;
+  duration.max = 180;
+  duration.value = cfg.rampDuration ?? 60;
+  duration.addEventListener("change", save);
+  durationField.appendChild(duration);
+  div.appendChild(durationField);
+
+  return div;
 }
 
 export function hideAlarms() {

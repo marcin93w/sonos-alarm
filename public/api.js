@@ -13,3 +13,23 @@ export async function getAlarms() {
   }
   return response.json();
 }
+
+export async function getAlarmConfig() {
+  const response = await fetch("/alarm-config", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Failed to load alarm config");
+  }
+  return response.json();
+}
+
+export async function saveAlarmConfig(alarmId, config) {
+  const response = await fetch("/alarm-config", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ alarmId, ...config }),
+  });
+  if (!response.ok) {
+    throw new Error("Failed to save alarm config");
+  }
+  return response.json();
+}
