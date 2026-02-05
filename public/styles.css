@@ -167,10 +167,9 @@ p {
 .config-field {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   font-size: 0.85rem;
   color: var(--muted);
-  max-width: 280px;
 }
 
 .config-field .icon {
@@ -180,7 +179,7 @@ p {
 }
 
 .config-field input[type="range"] {
-  flex: 1;
+  width: 120px;
   height: 6px;
   border-radius: 3px;
   background: var(--border);
@@ -207,11 +206,34 @@ p {
   cursor: pointer;
 }
 
-.slider-value {
-  min-width: 32px;
-  text-align: right;
-  color: var(--ink);
-  font-size: 0.85rem;
+.slider-wrap {
+  position: relative;
+  width: 120px;
+  display: flex;
+  align-items: center;
+}
+
+.slider-wrap input[type="range"] {
+  width: 100%;
+}
+
+.slider-marker {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--muted);
+  opacity: 0.5;
+  pointer-events: none;
+  transform: translateX(-50%);
+  top: 50%;
+  margin-top: -6px;
+}
+
+.slider-desc {
+  color: var(--muted);
+  font-size: 0.8rem;
+  white-space: nowrap;
 }
 
 #status {

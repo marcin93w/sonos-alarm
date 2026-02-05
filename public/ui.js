@@ -78,7 +78,7 @@ export function renderAlarms(alarms, configs, onConfigSave) {
 
       if (configs && onConfigSave && alarm.alarmId) {
         const cfg = configs[alarm.alarmId] || configs.defaults || {};
-        alarmItem.appendChild(renderAlarmConfig(alarm.alarmId, cfg, onConfigSave));
+        alarmItem.appendChild(renderAlarmConfig(alarm.alarmId, cfg, alarm.initialVolume, onConfigSave));
       }
 
       list.appendChild(alarmItem);
@@ -87,7 +87,7 @@ export function renderAlarms(alarms, configs, onConfigSave) {
   container.style.display = "block";
 }
 
-function renderAlarmConfig(alarmId, cfg, onConfigSave) {
+function renderAlarmConfig(alarmId, cfg, initialVolume, onConfigSave) {
   const div = document.createElement("div");
   div.className = "alarm-config";
 
@@ -115,17 +115,29 @@ function renderAlarmConfig(alarmId, cfg, onConfigSave) {
   maxVolIcon.className = "icon";
   maxVolIcon.textContent = "🔊";
   maxVolField.appendChild(maxVolIcon);
+  const sliderWrap = document.createElement("div");
+  sliderWrap.className = "slider-wrap";
   const maxVol = document.createElement("input");
   maxVol.type = "range";
   maxVol.min = 1;
   maxVol.max = 100;
   maxVol.value = cfg.maxVolume ?? 15;
+  sliderWrap.appendChild(maxVol);
+  if (initialVolume != null) {
+    const marker = document.createElement("div");
+    marker.className = "slider-marker";
+    marker.style.left = `${((initialVolume - 1) / 99) * 100}%`;
+    marker.title = `Start: ${initialVolume}`;
+    sliderWrap.appendChild(marker);
+  }
+  maxVolField.appendChild(sliderWrap);
+  const startVol = initialVolume ?? "?";
+  const volText = (v) => `Starts at ${startVol}, ends at ${v}`;
   const maxVolValue = document.createElement("span");
-  maxVolValue.className = "slider-value";
-  maxVolValue.textContent = maxVol.value;
-  maxVol.addEventListener("input", () => (maxVolValue.textContent = maxVol.value));
+  maxVolValue.className = "slider-desc";
+  maxVolValue.textContent = volText(maxVol.value);
+  maxVol.addEventListener("input", () => (maxVolValue.textContent = volText(maxVol.value)));
   maxVol.addEventListener("change", save);
-  maxVolField.appendChild(maxVol);
   maxVolField.appendChild(maxVolValue);
   div.appendChild(maxVolField);
 
@@ -140,10 +152,11 @@ function renderAlarmConfig(alarmId, cfg, onConfigSave) {
   duration.min = 1;
   duration.max = 180;
   duration.value = cfg.rampDuration ?? 60;
+  const durationText = (v) => `Reaches max volume in ${v} min`;
   const durationValue = document.createElement("span");
-  durationValue.className = "slider-value";
-  durationValue.textContent = duration.value + "m";
-  duration.addEventListener("input", () => (durationValue.textContent = duration.value + "m"));
+  durationValue.className = "slider-desc";
+  durationValue.textContent = durationText(duration.value);
+  duration.addEventListener("input", () => (durationValue.textContent = durationText(duration.value)));
   duration.addEventListener("change", save);
   durationField.appendChild(duration);
   durationField.appendChild(durationValue);
