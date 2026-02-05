@@ -29,7 +29,6 @@ async function updateAuthStatus() {
     } else {
       setConnectVisible(true);
       hideAlarms();
-      setStatus("Not connected.");
     }
   } catch (err) {
     setConnectVisible(true);

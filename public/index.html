@@ -3,19 +3,24 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Sonos alarm</title>
+    <title>Sonos easy mornings</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <main>
-      <h1>Sonos alarm</h1>
-      <p>Manage your Sonos connection and check alarms.</p>
-      <p>
-        <a href="/auth/start" id="connect-button" style="display: none;">Connect Sonos</a>
-      </p>
-      <div id="status"></div>
+      <section id="hero" class="hero">
+        <h1>Sonos easy mornings</h1>
+        <p class="tagline">Wake up gently with gradual volume</p>
+        <p class="description">
+          No more jarring alarm blasts. This app automatically ramps up your Sonos
+          alarm volume over time, starting soft and gradually reaching your target level.
+          Configure the duration and max volume for each alarm.
+        </p>
+        <a href="/auth/start" id="connect-button" class="cta-button" style="display: none;">Connect Sonos</a>
+        <div id="status"></div>
+      </section>
       <div id="alarms" style="display: none;">
-        <h2>Alarms</h2>
+        <h2>Your Alarms</h2>
         <ul id="alarms-list"></ul>
       </div>
     </main>
