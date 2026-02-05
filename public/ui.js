@@ -111,26 +111,42 @@ function renderAlarmConfig(alarmId, cfg, onConfigSave) {
 
   const maxVolField = document.createElement("label");
   maxVolField.className = "config-field";
-  maxVolField.append("Max vol");
+  const maxVolIcon = document.createElement("span");
+  maxVolIcon.className = "icon";
+  maxVolIcon.textContent = "🔊";
+  maxVolField.appendChild(maxVolIcon);
   const maxVol = document.createElement("input");
-  maxVol.type = "number";
+  maxVol.type = "range";
   maxVol.min = 1;
   maxVol.max = 100;
   maxVol.value = cfg.maxVolume ?? 15;
+  const maxVolValue = document.createElement("span");
+  maxVolValue.className = "slider-value";
+  maxVolValue.textContent = maxVol.value;
+  maxVol.addEventListener("input", () => (maxVolValue.textContent = maxVol.value));
   maxVol.addEventListener("change", save);
   maxVolField.appendChild(maxVol);
+  maxVolField.appendChild(maxVolValue);
   div.appendChild(maxVolField);
 
   const durationField = document.createElement("label");
   durationField.className = "config-field";
-  durationField.append("Ramp min");
+  const durationIcon = document.createElement("span");
+  durationIcon.className = "icon";
+  durationIcon.textContent = "⏱️";
+  durationField.appendChild(durationIcon);
   const duration = document.createElement("input");
-  duration.type = "number";
+  duration.type = "range";
   duration.min = 1;
   duration.max = 180;
   duration.value = cfg.rampDuration ?? 60;
+  const durationValue = document.createElement("span");
+  durationValue.className = "slider-value";
+  durationValue.textContent = duration.value + "m";
+  duration.addEventListener("input", () => (durationValue.textContent = duration.value + "m"));
   duration.addEventListener("change", save);
   durationField.appendChild(duration);
+  durationField.appendChild(durationValue);
   div.appendChild(durationField);
 
   return div;
