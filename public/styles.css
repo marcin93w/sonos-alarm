@@ -245,3 +245,18 @@ p {
 .hero #status {
   text-align: center;
 }
+
+footer {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 0.85rem;
+}
+
+footer a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+footer a:hover {
+  color: var(--ink);
+}
