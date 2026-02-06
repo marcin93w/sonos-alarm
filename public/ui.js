@@ -55,7 +55,7 @@ export function renderAlarms(alarms, configs, onConfigSave) {
 
       const alarmTitle = document.createElement("div");
       alarmTitle.className = "alarm-title";
-      alarmTitle.textContent = time ? `${label} - ${time}` : label;
+      alarmTitle.textContent = time ? time : label;
       header.appendChild(alarmTitle);
 
       if (enabled !== null) {
@@ -69,16 +69,15 @@ export function renderAlarms(alarms, configs, onConfigSave) {
       meta.className = "alarm-meta";
       const metaParts = [];
       if (days) metaParts.push(days);
-      if (volume !== null) metaParts.push(`Volume ${volume}`);
       if (groupIds) metaParts.push(groupIds);
       if (metaParts.length) meta.textContent = metaParts.join(" | ");
 
       alarmItem.appendChild(header);
       if (meta.textContent) alarmItem.appendChild(meta);
 
-      if (configs && onConfigSave && alarm.alarmId) {
+      if (configs && onConfigSave && alarm.alarmId && alarm.enabled) {
         const cfg = configs[alarm.alarmId] || configs.defaults || {};
-        alarmItem.appendChild(renderAlarmConfig(alarm.alarmId, cfg, alarm.initialVolume, onConfigSave));
+        alarmItem.appendChild(renderAlarmConfig(alarm.alarmId, cfg, alarm.initialVolume, alarm.startTime, onConfigSave));
       }
 
       list.appendChild(alarmItem);
@@ -87,7 +86,7 @@ export function renderAlarms(alarms, configs, onConfigSave) {
   container.style.display = "block";
 }
 
-function renderAlarmConfig(alarmId, cfg, initialVolume, onConfigSave) {
+function renderAlarmConfig(alarmId, cfg, initialVolume, startTime, onConfigSave) {
   const div = document.createElement("div");
   div.className = "alarm-config";
 
@@ -104,7 +103,6 @@ function renderAlarmConfig(alarmId, cfg, initialVolume, onConfigSave) {
   const toggle = document.createElement("input");
   toggle.type = "checkbox";
   toggle.checked = cfg.rampEnabled !== false;
-  toggle.addEventListener("change", save);
   toggleLabel.appendChild(toggle);
   toggleLabel.append("Volume ramp");
   div.appendChild(toggleLabel);
@@ -152,7 +150,14 @@ function renderAlarmConfig(alarmId, cfg, initialVolume, onConfigSave) {
   duration.min = 1;
   duration.max = 180;
   duration.value = cfg.rampDuration ?? 60;
-  const durationText = (v) => `Reaches max volume in ${v} min`;
+  const durationText = (v) => {
+    if (!startTime) return `Reaches max volume in ${v} min`;
+    const start = new Date(startTime);
+    if (Number.isNaN(start.getTime())) return `Reaches max volume in ${v} min`;
+    const end = new Date(start.getTime() + v * 60 * 1000);
+    const endTime = end.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `Reaches max volume at ${endTime} (${v} min)`;
+  };
   const durationValue = document.createElement("span");
   durationValue.className = "slider-desc";
   durationValue.textContent = durationText(duration.value);
@@ -161,6 +166,17 @@ function renderAlarmConfig(alarmId, cfg, initialVolume, onConfigSave) {
   durationField.appendChild(duration);
   durationField.appendChild(durationValue);
   div.appendChild(durationField);
+
+  const updateVisibility = () => {
+    const show = toggle.checked;
+    maxVolField.style.display = show ? "" : "none";
+    durationField.style.display = show ? "" : "none";
+  };
+  updateVisibility();
+  toggle.addEventListener("change", () => {
+    updateVisibility();
+    save();
+  });
 
   return div;
 }
